@@ -1,0 +1,22 @@
+{
+  "pythonVersion": "3.11",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnknownParameterType": "none",
+  "reportMissingTypeStubs": "none",
+  "reportOperatorIssue": "warning",
+  "reportAttributeAccessIssue": "error",
+  "reportReturnType": "error",
+  "reportCallIssue": "error",
+  "reportAssignmentType": "error",
+  "reportArgumentType": "error",
+  "reportOptionalSubscript": "error",
+  "exclude": [
+    "Old_Stuff/**",
+    "**/__pycache__/**"
+  ]
+}

@@ -1,0 +1,99 @@
+subsystem: LeaveManagement
+function_category: MGR
+function: UC-03 Process Leave Request
+screen_id: SCR-MGR-01
+screen_name_en: Manager Approval Dashboard
+screen_name_ja: 承認ダッシュボード
+type: list
+layout: full_page
+access_roles: [Manager]
+source:
+  document: "Screen List.md / RDD §3.3"
+  section: "SCR-MGR-01"
+
+primary_entities:
+  - LeaveRequest
+  - Employee
+
+xpath_constraints:
+  LeaveRequest: "[LeaveRequest.LeaveRequest_Approver/LeaveRequest.Employee[id = '[%CurrentUser%]'] and Status = 'PENDING']"
+  source: "RDD §3.3 / §4.3"
+
+details:
+
+  - section: KPISummary
+    item_type: data_view
+    table_column: virtual_kpi
+    fields:
+      - { item_type: text_box, label_ja: "保留件数",       table_column: kpi.pending_count,    read_only: true }
+      - { item_type: text_box, label_ja: "今週開始申請",   table_column: kpi.starts_this_week, read_only: true }
+      - { item_type: text_box, label_ja: "今日決裁待ち",   table_column: kpi.today_count,      read_only: true }
+
+  - section: FilterBar
+    item_type: filter_bar
+    fields:
+      - { item_type: text_box,    label_ja: "申請番号",  table_column: filter.RequestCode,    operator: contains }
+      - { item_type: drop_down,   label_ja: "申請者",    table_column: filter.OwnerEmployeeId,
+          datasource: "Employee where ManagerEmployeeId = $CurrentEmployee.EmployeeId",
+          display: FullName }
+      - { item_type: drop_down,   label_ja: "休暇種別",  table_column: filter.LeaveTypeId,
+          datasource: "LeaveType where ActiveFlag = true", display: NameJP }
+      - { item_type: date_picker, label_ja: "開始日から",table_column: filter.StartFrom }
+      - { item_type: date_picker, label_ja: "開始日まで",table_column: filter.StartTo }
+      - { item_type: drop_down,   label_ja: "ステータス",table_column: filter.Status,
+          options_source: Enum_LeaveStatus,
+          default: PENDING }
+      - { item_type: button,      label_ja: "検索",      style: primary,  triggers_event: EVT_OnClick_Search }
+      - { item_type: button,      label_ja: "クリア",    style: tertiary, triggers_event: EVT_OnClick_ClearFilter }
+
+  - section: Grid
+    item_type: data_grid
+    table_column: LeaveRequest
+    columns:
+      - { table_column: LeaveRequest.RequestCode,        label_ja: "申請番号" }
+      - { table_column: LeaveRequest.OwnerEmployeeId,    label_ja: "申請者",     display: Employee.FullName }
+      - { table_column: LeaveRequest.LeaveTypeId,        label_ja: "休暇種別",   display: LeaveType.NameJP }
+      - { table_column: LeaveRequest.StartDate,          label_ja: "開始日",     format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.EndDate,            label_ja: "終了日",     format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.TotalDays,          label_ja: "日数",       format: "#,##0.0" }
+      - { table_column: LeaveRequest.SubmittedAt,        label_ja: "申請日時",   format: "yyyy/MM/dd HH:mm" }
+      - { table_column: LeaveRequest.Status,             label_ja: "ステータス", display: enum_caption_ja }
+    default_sort: { column: SubmittedAt, direction: ASC }
+    page_size: 25
+    selection_mode: single
+    source: "RDD §3.3 — action-oriented Data Grid"
+
+basic_validations: []
+
+crud:
+  - { entity: LeaveRequest, operations: [R], source: "RDD UC-03 — list pending" }
+  - { entity: Employee,     operations: [R], source: "Owner / Approver join for display" }
+  - { entity: LeaveType,    operations: [R], source: "Filter dropdown" }
+
+events:
+
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_Manager_LoadDashboard
+    description: "Retrieve pending requests assigned to $CurrentEmployee (XPath above) + KPIs."
+
+  - event_id: EVT_OnClick_Search
+    trigger: button_click
+    action: refresh_grid_with_filters
+
+  - event_id: EVT_OnClick_ClearFilter
+    trigger: button_click
+    action: reset_filter_state
+
+  - event_id: EVT_OnRowSelect
+    trigger: grid_row_select
+    action: ACT_LeaveRequest_OpenForApproval
+    target_screen: SCR-MGR-02
+    target_mode: review
+    description: "Open SCR-MGR-02 as modal. Precondition Status==PENDING (Screen Flow §3)."
+    error_messages: [E012]
+
+  - event_id: EVT_OnRefresh
+    trigger: post_popup_close
+    action: refresh_data_sources
+    description: "Per Screen Flow §3 Automatic Refresh after SCR-MGR-02 closes."

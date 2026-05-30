@@ -1,0 +1,83 @@
+subsystem: LeaveManagement
+function_category: HR
+function: HR Analytics
+screen_id: SCR-HR-01
+screen_name_en: HR Overview Dashboard
+screen_name_ja: 人事概要ダッシュボード
+type: dashboard
+layout: full_page
+access_roles: [HR_Admin]
+source:
+  document: "Screen List.md / Screen Flow §1, §2.C"
+  section: "SCR-HR-01"
+
+primary_entities:
+  - LeaveRequest
+  - LeaveBalance
+  - Employee
+
+details:
+
+  - section: KPIs
+    item_type: data_view
+    table_column: virtual_kpi
+    fields:
+      - { item_type: text_box, label_ja: "本日休暇中人数",  table_column: kpi.absent_today,        read_only: true }
+      - { item_type: text_box, label_ja: "今月の承認済",    table_column: kpi.approved_this_month, read_only: true }
+      - { item_type: text_box, label_ja: "全社保留件数",    table_column: kpi.pending_count,       read_only: true }
+      - { item_type: text_box, label_ja: "繰越失効予定",    table_column: kpi.carryover_expiring,  read_only: true, source: "BR-09 (Mar-31)" }
+
+  - section: TrendChart
+    item_type: chart
+    chart_type: line
+    title_ja: "月別休暇取得トレンド"
+    x_axis: "month (last 12 months)"
+    y_axis: "approved leave days"
+    data_source: "DS_HR_TrendByMonth"
+
+  - section: TypeDistribution
+    item_type: chart
+    chart_type: pie
+    title_ja: "休暇種別の構成比"
+    data_source: "DS_HR_DistributionByType"
+
+  - section: DepartmentAbsence
+    item_type: data_grid
+    table_column: department_absence
+    columns:
+      - { table_column: Department.DepartmentName, label_ja: "部署" }
+      - { table_column: kpi.today_count,           label_ja: "本日不在数" }
+      - { table_column: kpi.week_count,            label_ja: "今週不在数" }
+
+  - section: Sidebar
+    item_type: nav_menu
+    items:
+      - { label_ja: "ダッシュボード",   target_screen: SCR-HR-01, active: true }
+      - { label_ja: "休暇種別",         target_screen: SCR-HR-02, triggers_event: EVT_Nav_HR02 }
+      - { label_ja: "社員残高",         target_screen: SCR-HR-03, triggers_event: EVT_Nav_HR03 }
+      - { label_ja: "レポート",         target_screen: SCR-HR-04, triggers_event: EVT_Nav_HR04 }
+
+basic_validations: []
+
+crud:
+  - { entity: LeaveRequest, operations: [R], source: "Aggregations" }
+  - { entity: LeaveBalance, operations: [R], source: "Carryover expiry alert (BR-09)" }
+  - { entity: Employee,     operations: [R], source: "Department absence grid" }
+
+events:
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_HR_LoadOverview
+    description: "Aggregate queries; no XPath restriction for HR_Admin (RDD §4.3)."
+  - event_id: EVT_Nav_HR02
+    trigger: menu_click
+    action: navigate
+    target_screen: SCR-HR-02
+  - event_id: EVT_Nav_HR03
+    trigger: menu_click
+    action: navigate
+    target_screen: SCR-HR-03
+  - event_id: EVT_Nav_HR04
+    trigger: menu_click
+    action: navigate
+    target_screen: SCR-HR-04

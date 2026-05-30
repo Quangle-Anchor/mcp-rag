@@ -1,0 +1,123 @@
+subsystem: LeaveManagement
+function_category: HR
+function: Balance Adjustment
+screen_id: SCR-HR-03
+screen_name_en: Employee Balance Manager
+screen_name_ja: 社員残高管理
+type: master_maintenance
+layout: full_page
+access_roles: [HR_Admin]
+source:
+  document: "Screen List.md / RDD §5 Data Migration"
+  section: "SCR-HR-03"
+
+primary_entities:
+  - LeaveBalance
+  - Employee
+  - LeaveType
+
+details:
+
+  - section: FilterBar
+    item_type: filter_bar
+    fields:
+      - { item_type: text_box,  label_ja: "社員番号", table_column: filter.EmployeeId, operator: contains }
+      - { item_type: text_box,  label_ja: "氏名",     table_column: filter.FullName,   operator: contains }
+      - { item_type: drop_down, label_ja: "部署",     table_column: filter.DepartmentId,
+          datasource: "Department where ActiveFlag=true", display: DepartmentName }
+      - { item_type: drop_down, label_ja: "休暇種別", table_column: filter.LeaveTypeId,
+          datasource: "LeaveType where ActiveFlag=true", display: NameJP }
+      - { item_type: text_box,  label_ja: "年度",     table_column: filter.FiscalYear, default: "$currentYear" }
+      - { item_type: button,    label_ja: "検索",     style: primary,   triggers_event: EVT_OnClick_Search }
+
+  - section: Toolbar
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "調整",          style: primary,   triggers_event: EVT_OnClick_Adjust }
+      - { item_type: button, label_ja: "Excelインポート", style: secondary, triggers_event: EVT_OnClick_Import,
+          source: "RDD §5 (Mendix Excel Importer)" }
+      - { item_type: button, label_ja: "テンプレート",   style: tertiary,  triggers_event: EVT_OnClick_DownloadTemplate }
+
+  - section: Grid
+    item_type: data_grid
+    table_column: LeaveBalance
+    columns:
+      - { table_column: Employee.EmployeeId,           label_ja: "社員番号" }
+      - { table_column: Employee.FullName,             label_ja: "氏名" }
+      - { table_column: Department.DepartmentName,     label_ja: "部署" }
+      - { table_column: LeaveType.NameJP,              label_ja: "休暇種別" }
+      - { table_column: LeaveBalance.FiscalYear,       label_ja: "年度" }
+      - { table_column: LeaveBalance.TotalDays,        label_ja: "付与",     format: "#,##0.0" }
+      - { table_column: LeaveBalance.CarryOver,        label_ja: "繰越",     format: "#,##0.0" }
+      - { table_column: LeaveBalance.UsedDays,         label_ja: "使用済",   format: "#,##0.0" }
+      - { table_column: LeaveBalance.PendingDays,      label_ja: "申請中",   format: "#,##0.0" }
+      - { table_column: LeaveBalance.AvailableDays,    label_ja: "利用可能", format: "#,##0.0" }
+    selection_mode: single
+    page_size: 50
+
+  - section: AdjustForm
+    item_type: popup_form
+    visibility: "$action == 'ADJUST'"
+    table_column: LeaveBalance
+    fields:
+      - { item_type: text_box,  label_ja: "現付与",  table_column: LeaveBalance.TotalDays,  read_only: true }
+      - { item_type: text_box,  label_ja: "新付与",  table_column: form.NewTotalDays,      required: true, format: "#,##0.0" }
+      - { item_type: text_box,  label_ja: "現繰越",  table_column: LeaveBalance.CarryOver, read_only: true }
+      - { item_type: text_box,  label_ja: "新繰越",  table_column: form.NewCarryOver,      required: true, format: "#,##0.0" }
+      - { item_type: text_area, label_ja: "理由",    table_column: form.AdjustReason,      required: true, max_length: 500 }
+
+basic_validations:
+
+  - id: VAL-HR03-001
+    field: form.NewTotalDays
+    rule: "value >= 0"
+    message: E001
+    source: "Inferred — non-negative balance"
+
+  - id: VAL-HR03-002
+    field: form.NewCarryOver
+    rule: "value >= 0"
+    message: E001
+    source: "Inferred — non-negative carryover"
+
+  - id: VAL-HR03-003
+    field: form.AdjustReason
+    rule: required
+    message: E001
+    source: "Audit policy (RDD §4.3) — manual adjustment must record reason"
+
+crud:
+  - { entity: LeaveBalance, operations: [R, U, C], source: "Manual adjust + Excel import create" }
+  - { entity: Employee,     operations: [R],       source: "Display columns" }
+  - { entity: LeaveType,    operations: [R],       source: "Filter / display" }
+  - { entity: RequestHistory, operations: [C],     source: "Optional — adjust audit log; deferred to BA confirmation" }
+
+events:
+
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_LeaveBalance_List
+
+  - event_id: EVT_OnClick_Search
+    trigger: button_click
+    action: refresh_grid_with_filters
+
+  - event_id: EVT_OnClick_Adjust
+    trigger: button_click
+    action: ACT_LeaveBalance_OpenAdjust
+
+  - event_id: EVT_OnClick_SaveAdjust
+    trigger: button_click
+    action: ACT_LeaveBalance_Adjust
+    description: "Persist new TotalDays/CarryOver + log audit. Recalculate AvailableDays."
+
+  - event_id: EVT_OnClick_DownloadTemplate
+    trigger: button_click
+    action: ACT_Balance_DownloadTemplate
+
+  - event_id: EVT_OnClick_Import
+    trigger: button_click
+    action: ACT_Balance_ImportExcel
+    description: "Use Mendix Excel Importer (RDD §5)."
+    post_messages: [I006]
+    error_messages: [E001, E014]

@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "mendix-rag": {
+      "command": "C:/Users/quang/AppData/Local/Programs/Python/Python311/python.exe",
+      "args": ["rag_system.py"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "GOOGLE_API_KEY": "AIzaSyCbPFY2KE_sTdJHZML3NJHcEsIRmahrqos",
+        "PINECONE_API_KEY": "pcsk_DDYJr_PSabQs2JGSEQkDY4D41JUxNtZm9SqxVNqiiZRHdPdENqvvr5W5jFtEkx1XX69vT"
+      }
+    }
+  }
+  
+}

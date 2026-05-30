@@ -1,0 +1,203 @@
+subsystem: LeaveManagement
+function_category: EMP
+function: UC-02 Submit Leave Request
+screen_id: SCR-EMP-02
+screen_name_en: Leave Request Form
+screen_name_ja: 休暇申請フォーム
+type: entry
+layout: popup_modal
+access_roles: [Employee]
+source:
+  document: "Screen List.md / RDD §3.3 / Screen Flow §2.A"
+  section: "SCR-EMP-02"
+
+open_modes: [create, edit]
+edit_precondition: "LeaveRequest.Status IN (DRAFT, REJECTED)"
+caller_screen: SCR-EMP-01
+
+primary_entities:
+  - LeaveRequest
+  - RequestAttachment
+
+details:
+
+  - section: Header
+    item_type: data_view
+    table_column: LeaveRequest
+    fields:
+      - { item_type: label,    label_ja: "申請番号",   table_column: LeaveRequest.RequestCode, read_only: true, visibility: "mode == edit" }
+      - { item_type: label,    label_ja: "ステータス", table_column: LeaveRequest.Status,      read_only: true, display: enum_caption_ja, visibility: "mode == edit" }
+
+  - section: Form
+    item_type: form
+    table_column: LeaveRequest
+    fields:
+      - { item_type: drop_down,       label_ja: "休暇種別",  table_column: LeaveRequest.LeaveTypeId,
+          datasource: "LeaveType where ActiveFlag = true",
+          display: NameJP, value: LeaveTypeId, required: true }
+      - { item_type: date_picker,     label_ja: "開始日",    table_column: LeaveRequest.StartDate,
+          required: true, format: "yyyy/MM/dd" }
+      - { item_type: date_picker,     label_ja: "終了日",    table_column: LeaveRequest.EndDate,
+          required: true, format: "yyyy/MM/dd" }
+      - { item_type: check_box,       label_ja: "半休",      table_column: LeaveRequest.IsHalfDay,
+          default: false,
+          on_change: EVT_OnChange_IsHalfDay }
+      - { item_type: drop_down,       label_ja: "時間帯",    table_column: LeaveRequest.Session,
+          options: [{ value: AM, caption_ja: 午前休 }, { value: PM, caption_ja: 午後休 }],
+          conditional_visibility: "IsHalfDay == true",
+          source: "RDD §3.3 Conditional Visibility; Domain Def §3 Session Exclusion" }
+      - { item_type: text_box,        label_ja: "日数",      table_column: LeaveRequest.TotalDays,
+          read_only: true, format: "#,##0.0",
+          source: "BR-04, BR-05 — calculated via SUB_CalculateDays" }
+      - { item_type: text_area,       label_ja: "理由",      table_column: LeaveRequest.Reason,
+          max_length: 500, required: false, rows: 4 }
+      - { item_type: file_uploader,   label_ja: "医療証明書", table_column: RequestAttachment,
+          accept: ".pdf,.jpg,.jpeg,.png",
+          conditional_visibility: "LeaveType.Code == 'SL' && TotalDays > 2",
+          required_when:           "LeaveType.Code == 'SL' && TotalDays > 2",
+          source: "BR-08" }
+
+  - section: Footer
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "下書き保存", style: secondary, triggers_event: EVT_OnClick_SaveDraft }
+      - { item_type: button, label_ja: "提出",       style: primary,   triggers_event: EVT_OnClick_Submit }
+      - { item_type: button, label_ja: "キャンセル", style: tertiary,  triggers_event: EVT_OnClick_Cancel }
+
+basic_validations:
+
+  - id: VAL-EMP02-001
+    field: LeaveTypeId
+    rule: required
+    message: E001
+    source: "RDD §3.1 UC-02 required inputs"
+
+  - id: VAL-EMP02-002
+    field: StartDate
+    rule: required
+    message: E001
+    source: "RDD §3.1 UC-02"
+
+  - id: VAL-EMP02-003
+    field: EndDate
+    rule: required
+    message: E001
+    source: "RDD §3.1 UC-02"
+
+  - id: VAL-EMP02-004
+    field: [StartDate, EndDate]
+    rule: "EndDate >= StartDate"
+    message: E002
+    source: "RDD §2.2 (valid date ranges)"
+
+  - id: VAL-EMP02-005
+    field: StartDate
+    rule: "LeaveType.Code != 'SL' ⇒ StartDate >= today + 2 business days"
+    message: E003
+    source: "BR-01 Advanced Notice"
+
+  - id: VAL-EMP02-006
+    field: TotalDays
+    rule: "LeaveType.Code == 'AL' ⇒ TotalDays <= LeaveBalance.AvailableDays"
+    message: E004
+    source: "BR-02 Sufficient Balance; Domain Def §3 Zero-Balance Constraint"
+
+  - id: VAL-EMP02-007
+    field: StartDate
+    rule: "LeaveType.AllowBackdate == false ⇒ StartDate >= today"
+    message: E005
+    source: "BR-03 No Backdating"
+
+  - id: VAL-EMP02-008
+    field: StartDate
+    rule: "LeaveType.Code == 'SL' ⇒ StartDate >= today - 3 days"
+    message: E006
+    source: "BR-03 Sick Leave exception (up to 3 days retroactively)"
+
+  - id: VAL-EMP02-009
+    field: [StartDate, EndDate]
+    rule: "NOT EXISTS LeaveRequest where OwnerEmployeeId=$Me AND Status IN (PENDING, APPROVED) AND date_overlap(StartDate, EndDate, this.StartDate, this.EndDate)"
+    message: E008
+    source: "BR-07 Overlap Prevention"
+
+  - id: VAL-EMP02-010
+    field: RequestAttachment
+    rule: "LeaveType.Code == 'SL' AND TotalDays > 2 ⇒ attachment count >= 1"
+    message: E009
+    source: "BR-08 Sick Leave Proof"
+
+  - id: VAL-EMP02-011
+    field: TotalDays
+    rule: "TotalDays > 0"
+    message: E015
+    source: "Inferred from BR-04 — period must contain >=1 business day"
+
+  - id: VAL-EMP02-012
+    field: Reason
+    rule: "len(Reason) <= 500"
+    message: E016
+    source: "Inferred from LeaveRequest.Reason length"
+
+  - id: VAL-EMP02-013
+    field: Status
+    rule: "edit mode allowed only if Status IN (DRAFT, REJECTED)"
+    message: E010
+    source: "Screen Flow §3 State-Based Access; BR-10"
+
+crud:
+  - { entity: LeaveRequest,     operations: [C, R, U], source: "RDD UC-02" }
+  - { entity: RequestAttachment,operations: [C, R, D], source: "BR-08" }
+  - { entity: LeaveBalance,     operations: [R],       source: "BR-02 balance check" }
+  - { entity: LeaveType,        operations: [R],       source: "Dropdown source" }
+  - { entity: PublicHoliday,    operations: [R],       source: "BR-04 day-count exclusion" }
+  - { entity: SystemCounter,    operations: [R, U],    source: "Code Def §4 — Submit only" }
+
+events:
+
+  - event_id: EVT_OnOpen
+    trigger: page_load
+    action: ACT_LeaveRequest_Open
+    description: "If mode=create, instantiate LeaveRequest(Status=DRAFT, OwnerEmployeeId=$CurrentEmployee). If mode=edit, retrieve by id."
+
+  - event_id: EVT_OnChange_IsHalfDay
+    trigger: field_change
+    action: NF_LeaveRequest_RecalcOnHalfDay
+    description: "Nanoflow — if IsHalfDay==true, set TotalDays=0.5 and show/enable Session; else clear Session and call SUB_CalculateDays."
+    source: "BR-05; Domain Def §3 Session Exclusion"
+    post_messages: [W001]
+
+  - event_id: EVT_OnChange_DateOrType
+    trigger: field_change
+    fields: [StartDate, EndDate, LeaveTypeId, IsHalfDay]
+    action: SUB_CalculateDays
+    description: "Recompute TotalDays excluding weekends and PublicHoliday rows (BR-04). If IsHalfDay=true, force 0.5 (BR-05)."
+
+  - event_id: EVT_OnClick_SaveDraft
+    trigger: button_click
+    action: ACT_LeaveRequest_SaveDraft
+    description: "Persist with Status=DRAFT. Skip business validations except date order. Show I004."
+    post_messages: [I004]
+
+  - event_id: EVT_OnClick_Submit
+    trigger: button_click
+    action: ACT_LeaveRequest_Submit
+    description: |
+      1) Run all basic_validations.
+      2) Resolve ApproverEmployeeId from OwnerEmployeeId.ManagerEmployeeId (BR-06 self-approval block).
+      3) Issue RequestCode via SUB_GenerateCode (Code Def §4) — set immutable.
+      4) Update Status DRAFT/REJECTED → PENDING; SubmittedAt = now.
+      5) Recompute LeaveBalance.PendingDays.
+      6) Trigger email notification to Approver (RDD §2.2 step 3).
+      7) Close popup; return to caller.
+    post_messages: [I001]
+    error_messages: [E001, E002, E003, E004, E005, E006, E008, E009, E011, E013, E014, E015, E016, E012]
+
+  - event_id: EVT_OnClick_Cancel
+    trigger: button_click
+    action: close_popup
+    description: "If unsaved changes, prompt confirm; otherwise close."
+
+  - event_id: EVT_OnSubmit_RollbackOnFail
+    trigger: post_microflow_fail
+    action: stay_on_popup
+    description: "Per Screen Flow §3 Error Handling — remain on SCR-EMP-02 and display validation message; no transition."

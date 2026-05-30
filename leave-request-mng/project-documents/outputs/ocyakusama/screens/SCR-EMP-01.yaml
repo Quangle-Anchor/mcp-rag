@@ -1,0 +1,92 @@
+subsystem: LeaveManagement
+function_category: EMP
+function: UC-01 View Leave Dashboard
+screen_id: SCR-EMP-01
+screen_name_en: Employee Dashboard
+screen_name_ja: 社員ダッシュボード
+type: dashboard
+layout: full_page
+access_roles: [Employee]
+source:
+  document: "Screen List.md / RDD §3.3"
+  section: "SCR-EMP-01"
+
+primary_entities:
+  - LeaveBalance
+  - LeaveRequest
+
+xpath_constraints:
+  LeaveBalance: "[LeaveRequest.LeaveBalance_Employee/LeaveRequest.Employee[id = '[%CurrentUser%]']]"
+  LeaveRequest: "[LeaveRequest.LeaveRequest_Owner/LeaveRequest.Employee[id = '[%CurrentUser%]']]"
+  source: "RDD §4.3 example XPath"
+
+details:
+
+  # ---- Balance Cards (Data View, one per LeaveType) ----
+  - section: BalanceCards
+    item_type: data_view
+    table_column: LeaveBalance
+    fields:
+      - { item_type: label,       label_ja: "休暇種別",    table_column: LeaveType.NameJP }
+      - { item_type: text_box,    label_ja: "付与日数",    table_column: LeaveBalance.TotalDays,       read_only: true, format: "#,##0.0" }
+      - { item_type: text_box,    label_ja: "繰越",        table_column: LeaveBalance.CarryOver,       read_only: true, format: "#,##0.0" }
+      - { item_type: text_box,    label_ja: "使用済",      table_column: LeaveBalance.UsedDays,        read_only: true, format: "#,##0.0" }
+      - { item_type: text_box,    label_ja: "申請中",      table_column: LeaveBalance.PendingDays,     read_only: true, format: "#,##0.0" }
+      - { item_type: text_box,    label_ja: "利用可能",    table_column: LeaveBalance.AvailableDays,   read_only: true, format: "#,##0.0", emphasise: true }
+    source: "RDD UC-01 (allocated, used, pending, available)"
+
+  # ---- Action Bar ----
+  - section: ActionBar
+    item_type: button
+    label_ja: "新規申請"
+    label_en: "New Request"
+    triggers_event: EVT_OnClick_NewRequest
+
+  # ---- History Data Grid ----
+  - section: HistoryGrid
+    item_type: data_grid
+    table_column: LeaveRequest
+    columns:
+      - { table_column: LeaveRequest.RequestCode,     label_ja: "申請番号",   width: 140 }
+      - { table_column: LeaveRequest.LeaveTypeId,     label_ja: "休暇種別",   display: LeaveType.NameJP }
+      - { table_column: LeaveRequest.StartDate,       label_ja: "開始日",     format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.EndDate,         label_ja: "終了日",     format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.TotalDays,       label_ja: "日数",       format: "#,##0.0" }
+      - { table_column: LeaveRequest.Status,          label_ja: "ステータス", display: enum_caption_ja }
+      - { table_column: LeaveRequest.SubmittedAt,     label_ja: "申請日時",   format: "yyyy/MM/dd HH:mm" }
+    default_sort: { column: SubmittedAt, direction: DESC }
+    page_size: 20
+    selection_mode: single
+    source: "RDD §3.3 List View + Screen Flow §2.A"
+
+basic_validations: []   # read-only dashboard; validations live on EMP-02
+
+crud:
+  - { entity: LeaveBalance, operations: [R],          source: "RDD UC-01" }
+  - { entity: LeaveRequest, operations: [R],          source: "RDD UC-01 history" }
+
+events:
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_Employee_LoadDashboard
+    description: "Microflow returns ($CurrentEmployee, BalanceList[], RequestList[]). Show W002 if CarryOver > 0 and today > Mar-15."
+    pre_messages: [W002]
+
+  - event_id: EVT_OnClick_NewRequest
+    trigger: button_click
+    action: ACT_LeaveRequest_OpenNew
+    target_screen: SCR-EMP-02
+    target_mode: create
+    description: "Create empty LeaveRequest (Status=DRAFT), open SCR-EMP-02 in modal."
+
+  - event_id: EVT_OnRowSelect_History
+    trigger: grid_row_select
+    action: ACT_LeaveRequest_OpenDetail
+    routing_rules:
+      - { when: "Status IN (DRAFT, REJECTED)", target_screen: SCR-EMP-02, target_mode: edit, source: "Screen Flow §3 State-Based Access" }
+      - { when: "Status IN (PENDING, APPROVED, CANCELLED)", target_screen: SCR-EMP-03, target_mode: readonly }
+
+  - event_id: EVT_OnRefresh
+    trigger: post_popup_close
+    action: refresh_data_sources
+    description: "Re-run DS_Employee_LoadDashboard after SCR-EMP-02/03 closes (Screen Flow §3 Automatic Refresh)."

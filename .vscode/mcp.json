@@ -1,0 +1,25 @@
+{
+    "servers": {
+        "mendix-rag-server": {
+            "command": "python",
+            "args": [
+                "c:/Users/quang/Downloads/mcp-rag 1/mcp-rag/mcp-rag/leave-request-mng/rag-production-system/mcp_server.py"
+            ],
+            "env": {
+                "GOOGLE_API_KEY": "AIzaSyCbPFY2KE_sTdJHZML3NJHcEsIRmahrqos",
+                "PINECONE_API_KEY": "pcsk_DDYJr_PSabQs2JGSEQkDY4D41JUxNtZm9SqxVNqiiZRHdPdENqvvr5W5jFtEkx1XX69vT"
+            }
+        },
+        "mx-sdk-connect": {
+            "command": "node",
+            "args": [
+                "c:/Users/quang/Downloads/mcp-rag 1/mcp-rag/mcp-rag/mx-connector-microflow/dist/index.js"
+            ],
+            "env": {
+                "PROJECT_ID": "7cef44f9-4ef7-4f3a-97b7-c5c95d15f172",
+                "MENDIX_ACCESS_TOKEN": "7c6RqnF2r6TJus4jhu3PLYttTRjsMEUegJRNn7q3hkkSEPy6CCDcJXT3zj5pRf2wPFS6BT4TJao942kjkpXVyfW2fB66v3AZX5Lx",
+                "WORKING_BRANCH_NAME": "main"
+            }
+        }
+    }
+}

@@ -1,0 +1,146 @@
+subsystem: LeaveManagement
+function_category: MGR
+function: UC-03 Process Leave Request
+screen_id: SCR-MGR-02
+screen_name_en: Approval Action Dialog
+screen_name_ja: 承認アクションダイアログ
+type: detail
+layout: popup_modal
+access_roles: [Manager]
+caller_screen: SCR-MGR-01
+source:
+  document: "Screen List.md / Screen Flow §2.B"
+  section: "SCR-MGR-02"
+
+open_precondition: "LeaveRequest.Status = PENDING"
+xpath_constraints:
+  LeaveRequest: "[LeaveRequest.LeaveRequest_Approver/LeaveRequest.Employee[id = '[%CurrentUser%]'] and Status = 'PENDING']"
+  approve_constraint: "[not(LeaveRequest.LeaveRequest_Approver/LeaveRequest.Employee[id = '[%CurrentUser%]'])]  # BR-06 self-approval block"
+  source: "RDD §4.3 / BR-06"
+
+primary_entities:
+  - LeaveRequest
+  - Employee
+  - LeaveBalance
+
+details:
+
+  - section: RequesterPanel
+    item_type: data_view
+    table_column: Employee
+    fields:
+      - { item_type: text_box, label_ja: "申請者",  table_column: Employee.FullName,                 read_only: true }
+      - { item_type: text_box, label_ja: "部署",    table_column: Department.DepartmentName,         read_only: true }
+      - { item_type: text_box, label_ja: "メール",  table_column: Employee.Email,                    read_only: true }
+      - { item_type: text_box, label_ja: "利用可能日数", table_column: LeaveBalance.AvailableDays,   read_only: true, format: "#,##0.0",
+          description: "Sum across types for context; precise value per LeaveTypeId of this request" }
+
+  - section: RequestPanel
+    item_type: data_view
+    table_column: LeaveRequest
+    fields:
+      - { item_type: text_box, label_ja: "申請番号",   table_column: LeaveRequest.RequestCode,  read_only: true }
+      - { item_type: text_box, label_ja: "休暇種別",   table_column: LeaveType.NameJP,          read_only: true }
+      - { item_type: text_box, label_ja: "開始日",     table_column: LeaveRequest.StartDate,    read_only: true, format: "yyyy/MM/dd" }
+      - { item_type: text_box, label_ja: "終了日",     table_column: LeaveRequest.EndDate,      read_only: true, format: "yyyy/MM/dd" }
+      - { item_type: text_box, label_ja: "半休",       table_column: LeaveRequest.IsHalfDay,    read_only: true, display: "はい/いいえ" }
+      - { item_type: text_box, label_ja: "時間帯",     table_column: LeaveRequest.Session,      read_only: true, conditional_visibility: "IsHalfDay == true" }
+      - { item_type: text_box, label_ja: "日数",       table_column: LeaveRequest.TotalDays,    read_only: true, format: "#,##0.0" }
+      - { item_type: text_area,label_ja: "理由",       table_column: LeaveRequest.Reason,       read_only: true }
+      - { item_type: text_box, label_ja: "申請日時",   table_column: LeaveRequest.SubmittedAt,  read_only: true, format: "yyyy/MM/dd HH:mm" }
+
+  - section: AttachmentPanel
+    item_type: list_view
+    table_column: RequestAttachment
+    conditional_visibility: "EXISTS RequestAttachment for this LeaveRequest"
+    columns:
+      - { table_column: RequestAttachment.FileName,   label_ja: "ファイル名" }
+      - { item_type: button, label_ja: "ダウンロード", triggers_event: EVT_OnClick_Download }
+
+  - section: DecisionPanel
+    item_type: form
+    fields:
+      - { item_type: text_area, label_ja: "承認者コメント", table_column: LeaveRequest.ManagerComment,
+          max_length: 500, rows: 4,
+          required_when: "$action == 'REJECT'",
+          description: "Required when Status moves to REJECTED (Code Def §2)" }
+
+  - section: Footer
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "承認",       style: primary,    triggers_event: EVT_OnClick_Approve }
+      - { item_type: button, label_ja: "却下",       style: danger,     triggers_event: EVT_OnClick_Reject }
+      - { item_type: button, label_ja: "キャンセル", style: tertiary,   triggers_event: EVT_OnClick_Close }
+
+basic_validations:
+
+  - id: VAL-MGR02-001
+    field: ApproverEmployeeId
+    rule: "ApproverEmployeeId != $CurrentEmployee.EmployeeId OR OwnerEmployeeId != $CurrentEmployee.EmployeeId"
+    message: E007
+    source: "BR-06 Self-Approval Block"
+
+  - id: VAL-MGR02-002
+    field: Status
+    rule: "Status == PENDING"
+    message: E012
+    source: "Domain Def §3 Status Transition Rule; Screen Flow §3"
+
+  - id: VAL-MGR02-003
+    field: ManagerComment
+    rule: "$action == 'REJECT' ⇒ len(ManagerComment) > 0"
+    message: E011
+    source: "RDD UC-03 — ManagerComment required for reject; Code Def §2"
+
+crud:
+  - { entity: LeaveRequest,      operations: [R, U],  source: "RDD UC-03 / Code Def §2" }
+  - { entity: LeaveBalance,      operations: [R, U],  source: "RDD UC-04 deduction on approve" }
+  - { entity: RequestHistory,    operations: [C],     source: "RDD §4.3 audit trail" }
+  - { entity: Employee,          operations: [R],     source: "Display owner panel" }
+  - { entity: RequestAttachment, operations: [R],     source: "View proof (BR-08)" }
+
+events:
+
+  - event_id: EVT_OnOpen
+    trigger: page_load
+    action: DS_LeaveRequest_GetForApproval
+    description: "Retrieve LeaveRequest by id; verify Status==PENDING; load owner & balance."
+    error_messages: [E012, E014]
+
+  - event_id: EVT_OnClick_Download
+    trigger: button_click
+    action: ACT_Attachment_Download
+
+  - event_id: EVT_OnClick_Approve
+    trigger: button_click
+    action: ACT_LeaveRequest_Approve
+    pre_messages: [C001]
+    description: |
+      1) Confirm via C001.
+      2) Re-check BR-06 (E007) and Status==PENDING (E012).
+      3) Set Status=APPROVED, DecidedAt=now, ApproverEmployeeId=$CurrentEmployee.
+      4) Insert RequestHistory.
+      5) Run ACT_LeaveBalance_Deduct (RDD UC-04 — Used += TotalDays, Pending -= TotalDays).
+      6) Trigger email notification to Owner (RDD §2.2 step 5).
+      7) Close popup, refresh grid.
+    post_messages: [I002]
+    error_messages: [E007, E012, E014]
+
+  - event_id: EVT_OnClick_Reject
+    trigger: button_click
+    action: ACT_LeaveRequest_Reject
+    pre_messages: [C002]
+    description: |
+      1) Confirm via C002.
+      2) Validate ManagerComment (E011) and BR-06 (E007).
+      3) Set Status=REJECTED, DecidedAt=now, store ManagerComment.
+      4) Insert RequestHistory.
+      5) Restore LeaveBalance.PendingDays -= TotalDays.
+      6) Trigger email notification to Owner.
+      7) Close popup, refresh grid.
+    post_messages: [I003]
+    error_messages: [E007, E011, E012, E014]
+
+  - event_id: EVT_OnClick_Close
+    trigger: button_click
+    action: close_popup

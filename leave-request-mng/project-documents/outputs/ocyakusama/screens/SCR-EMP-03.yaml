@@ -1,0 +1,106 @@
+subsystem: LeaveManagement
+function_category: EMP
+function: UC-02/UC-03 (Owner View)
+screen_id: SCR-EMP-03
+screen_name_en: Request Detail View
+screen_name_ja: 申請詳細表示
+type: detail
+layout: popup_readonly
+access_roles: [Employee]
+caller_screen: SCR-EMP-01
+source:
+  document: "Screen List.md / Screen Flow §2.A"
+  section: "SCR-EMP-03"
+
+primary_entities:
+  - LeaveRequest
+  - RequestHistory
+  - RequestAttachment
+
+xpath_constraints:
+  LeaveRequest: "[LeaveRequest.LeaveRequest_Owner/LeaveRequest.Employee[id = '[%CurrentUser%]']]"
+  source: "RDD §4.3"
+
+details:
+
+  - section: Header
+    item_type: data_view
+    table_column: LeaveRequest
+    fields:
+      - { item_type: text_box, label_ja: "申請番号",   table_column: LeaveRequest.RequestCode, read_only: true }
+      - { item_type: text_box, label_ja: "ステータス", table_column: LeaveRequest.Status,      read_only: true, display: enum_caption_ja }
+      - { item_type: text_box, label_ja: "休暇種別",   table_column: LeaveType.NameJP,         read_only: true }
+      - { item_type: text_box, label_ja: "開始日",     table_column: LeaveRequest.StartDate,   read_only: true, format: "yyyy/MM/dd" }
+      - { item_type: text_box, label_ja: "終了日",     table_column: LeaveRequest.EndDate,     read_only: true, format: "yyyy/MM/dd" }
+      - { item_type: text_box, label_ja: "半休",       table_column: LeaveRequest.IsHalfDay,   read_only: true, display: "はい/いいえ" }
+      - { item_type: text_box, label_ja: "時間帯",     table_column: LeaveRequest.Session,     read_only: true, conditional_visibility: "IsHalfDay == true" }
+      - { item_type: text_box, label_ja: "日数",       table_column: LeaveRequest.TotalDays,   read_only: true, format: "#,##0.0" }
+      - { item_type: text_area,label_ja: "理由",       table_column: LeaveRequest.Reason,      read_only: true }
+      - { item_type: text_box, label_ja: "申請日時",   table_column: LeaveRequest.SubmittedAt, read_only: true, format: "yyyy/MM/dd HH:mm" }
+      - { item_type: text_box, label_ja: "決裁日時",   table_column: LeaveRequest.DecidedAt,   read_only: true, format: "yyyy/MM/dd HH:mm" }
+      - { item_type: text_area,label_ja: "承認者コメント", table_column: LeaveRequest.ManagerComment, read_only: true,
+          conditional_visibility: "Status IN (APPROVED, REJECTED) AND ManagerComment != ''" }
+
+  - section: Attachments
+    item_type: list_view
+    table_column: RequestAttachment
+    conditional_visibility: "EXISTS RequestAttachment where LeaveRequestId = $LeaveRequest.LeaveRequestId"
+    columns:
+      - { table_column: RequestAttachment.FileName,    label_ja: "ファイル名" }
+      - { table_column: RequestAttachment.UploadedAt,  label_ja: "アップロード日時", format: "yyyy/MM/dd HH:mm" }
+      - { item_type: button, label_ja: "ダウンロード", triggers_event: EVT_OnClick_Download }
+
+  - section: History
+    item_type: list_view
+    table_column: RequestHistory
+    sort: { column: EventAt, direction: ASC }
+    columns:
+      - { table_column: RequestHistory.EventAt,         label_ja: "日時",       format: "yyyy/MM/dd HH:mm" }
+      - { table_column: RequestHistory.FromStatus,      label_ja: "前ステータス", display: enum_caption_ja }
+      - { table_column: RequestHistory.ToStatus,        label_ja: "新ステータス", display: enum_caption_ja }
+      - { table_column: RequestHistory.ActorEmployeeId, label_ja: "実施者" }
+      - { table_column: RequestHistory.Comment,         label_ja: "コメント" }
+    source: "RDD §4.3 audit trail"
+
+  - section: Footer
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "取消",   style: danger,    triggers_event: EVT_OnClick_Cancel_Request,
+          conditional_visibility: "Status == PENDING" }
+      - { item_type: button, label_ja: "閉じる", style: tertiary,  triggers_event: EVT_OnClick_Close }
+
+basic_validations: []
+
+crud:
+  - { entity: LeaveRequest,      operations: [R],    source: "Screen List.md SCR-EMP-03 (read-only)" }
+  - { entity: LeaveRequest,      operations: [U],    source: "Cancel action transitions Status PENDING → CANCELLED (Domain Def §3 Status Transition Rule)" }
+  - { entity: RequestHistory,    operations: [R, C], source: "Read trail + log Cancel event" }
+  - { entity: RequestAttachment, operations: [R],    source: "Download proof" }
+
+events:
+
+  - event_id: EVT_OnOpen
+    trigger: page_load
+    action: DS_LeaveRequest_GetDetail
+    description: "Retrieve LeaveRequest by id with associations (LeaveType, History, Attachments)."
+
+  - event_id: EVT_OnClick_Download
+    trigger: button_click
+    action: ACT_Attachment_Download
+    description: "Return the file blob via Mendix DownloadFile activity."
+
+  - event_id: EVT_OnClick_Cancel_Request
+    trigger: button_click
+    action: ACT_LeaveRequest_Cancel
+    pre_messages: [C003]
+    description: |
+      1) Confirm via C003.
+      2) Check Status == PENDING (Domain Def §3 — CANCELLED only from PENDING).
+      3) Update Status = CANCELLED; insert RequestHistory row.
+      4) Restore LeaveBalance.PendingDays.
+      5) Close popup, refresh caller.
+    error_messages: [E010, E012, E014]
+
+  - event_id: EVT_OnClick_Close
+    trigger: button_click
+    action: close_popup

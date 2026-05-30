@@ -1,0 +1,47 @@
+# ── Web Framework ──────────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# ── Configuration & Environment ────────────────────────────────────────────────
+pydantic>=2.7.1
+pydantic-settings>=2.2.1
+python-dotenv>=1.0.1
+
+# ── LangChain Ecosystem ────────────────────────────────────────────────────────
+langchain>=0.2.1
+langchain-core>=0.2.1
+langchain-community>=0.2.1
+langchain-text-splitters>=0.2.0
+
+# ── Google Gemini (mirrors rag_system.py) ─────────────────────────────────────
+langchain-google-genai>=1.0.5
+google-generativeai>=0.5.2
+
+# ── Pinecone (mirrors rag_system.py) ──────────────────────────────────────────
+pinecone-client>=3.2.2
+langchain-pinecone>=0.1.1
+
+# ── Relational DB ─────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.30
+aiosqlite>=0.20.0
+alembic>=1.13.1
+
+# ── Background Workers ────────────────────────────────────────────────────────
+celery>=5.4.0
+redis>=5.0.4
+flower>=2.0.1
+
+# ── RAG Evaluation (Optional / Guarded in code) ────────────────────────────────
+# Note: commented out on Python 3.14 because ragas depends on scikit-network,
+# which does not have prebuilt cp314 wheels on Windows and requires Microsoft Visual C++ Build Tools to compile.
+# If you have MSVC installed and wish to run evaluations, you can uncomment these.
+# ragas>=0.1.10
+# datasets>=2.19.2
+
+# ── Observability ─────────────────────────────────────────────────────────────
+loguru>=0.7.2
+prometheus-fastapi-instrumentator>=6.1.0
+
+# ── Resilience / Retry ────────────────────────────────────────────────────────
+tenacity>=8.3.0          # @retry decorator for Gemini 429 rate-limit back-off

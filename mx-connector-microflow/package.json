@@ -1,0 +1,24 @@
+{
+  "name": "mx-connector-microflow",
+  "version": "0.1.0",
+  "description": "MCP server for Mendix microflow authoring (microflow scope only)",
+  "type": "module",
+  "bin": {
+    "mx-connector-microflow": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "mendixmodelsdk": "^4.111.0",
+    "mendixplatformsdk": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

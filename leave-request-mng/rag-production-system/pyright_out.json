@@ -1,0 +1,686 @@
+﻿{
+    "version": "1.1.409",
+    "time": "1779510177174",
+    "generalDiagnostics": [
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\api\\chat_router.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 24,
+                    "character": 5
+                },
+                "end": {
+                    "line": 24,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\api\\ingest_router.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 18,
+                    "character": 5
+                },
+                "end": {
+                    "line": 18,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\api\\ingest_router.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"delay\" for class \"FunctionType\"\n┬á┬áAttribute \"delay\" is unknown",
+            "range": {
+                "start": {
+                    "line": 66,
+                    "character": 35
+                },
+                "end": {
+                    "line": 66,
+                    "character": 40
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\api\\ingest_router.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"delay\" for class \"FunctionType\"\n┬á┬áAttribute \"delay\" is unknown",
+            "range": {
+                "start": {
+                    "line": 108,
+                    "character": 36
+                },
+                "end": {
+                    "line": 108,
+                    "character": 41
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\config.py",
+            "severity": "error",
+            "message": "Arguments missing for parameters \"app_env\", \"google_api_key\", \"pinecone_api_key\", \"chunk_size\", \"chunk_overlap\", \"top_k_retrieval\"",
+            "range": {
+                "start": {
+                    "line": 68,
+                    "character": 11
+                },
+                "end": {
+                    "line": 68,
+                    "character": 21
+                }
+            },
+            "rule": "reportCallIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\generation\\chain.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 5
+                },
+                "end": {
+                    "line": 22,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\classifier.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 18,
+                    "character": 5
+                },
+                "end": {
+                    "line": 18,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\classifier.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"strip\" for class \"list[str | dict[Unknown, Unknown]]\"\n┬á┬áAttribute \"strip\" is unknown",
+            "range": {
+                "start": {
+                    "line": 138,
+                    "character": 31
+                },
+                "end": {
+                    "line": 138,
+                    "character": 36
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\embeddings.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 17,
+                    "character": 5
+                },
+                "end": {
+                    "line": 17,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\embeddings.py",
+            "severity": "error",
+            "message": "Method \"embed_documents\" overrides class \"GoogleGenerativeAIEmbeddings\" in an incompatible manner\n┬á┬áParameter \"batch_size\" is missing in override\n┬á┬áParameter \"task_type\" is missing in override\n┬á┬áParameter \"titles\" is missing in override\n┬á┬áParameter \"output_dimensionality\" is missing in override",
+            "range": {
+                "start": {
+                    "line": 35,
+                    "character": 8
+                },
+                "end": {
+                    "line": 35,
+                    "character": 23
+                }
+            },
+            "rule": "reportIncompatibleMethodOverride"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\embeddings.py",
+            "severity": "error",
+            "message": "Method \"embed_query\" overrides class \"GoogleGenerativeAIEmbeddings\" in an incompatible manner\n┬á┬áParameter \"task_type\" is missing in override\n┬á┬áParameter \"title\" is missing in override\n┬á┬áParameter \"output_dimensionality\" is missing in override",
+            "range": {
+                "start": {
+                    "line": 44,
+                    "character": 8
+                },
+                "end": {
+                    "line": 44,
+                    "character": 19
+                }
+            },
+            "rule": "reportIncompatibleMethodOverride"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\embeddings.py",
+            "severity": "error",
+            "message": "Function with declared return type \"list[float]\" must return value on all code paths\n┬á┬á\"None\" is not assignable to \"list[float]\"",
+            "range": {
+                "start": {
+                    "line": 44,
+                    "character": 40
+                },
+                "end": {
+                    "line": 44,
+                    "character": 51
+                }
+            },
+            "rule": "reportReturnType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\embeddings.py",
+            "severity": "error",
+            "message": "No parameter named \"google_api_key\"",
+            "range": {
+                "start": {
+                    "line": 68,
+                    "character": 8
+                },
+                "end": {
+                    "line": 68,
+                    "character": 22
+                }
+            },
+            "rule": "reportCallIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\ingestion\\loader.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 5
+                },
+                "end": {
+                    "line": 22,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\retrieval\\query_optimizer.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 17,
+                    "character": 5
+                },
+                "end": {
+                    "line": 17,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\core\\retrieval\\retriever.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 18,
+                    "character": 5
+                },
+                "end": {
+                    "line": 18,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\db\\relational_db.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 12,
+                    "character": 5
+                },
+                "end": {
+                    "line": 12,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\db\\relational_db.py",
+            "severity": "error",
+            "message": "Type \"_RelationshipDeclared[Any]\" is not assignable to declared type \"list[ChatMessageRecord]\"\n┬á┬á\"_RelationshipDeclared[Any]\" is not assignable to \"list[ChatMessageRecord]\"",
+            "range": {
+                "start": {
+                    "line": 58,
+                    "character": 42
+                },
+                "end": {
+                    "line": 60,
+                    "character": 5
+                }
+            },
+            "rule": "reportAssignmentType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\db\\relational_db.py",
+            "severity": "error",
+            "message": "Type \"_RelationshipDeclared[Any]\" is not assignable to declared type \"ChatSession\"\n┬á┬á\"_RelationshipDeclared[Any]\" is not assignable to \"ChatSession\"",
+            "range": {
+                "start": {
+                    "line": 72,
+                    "character": 27
+                },
+                "end": {
+                    "line": 72,
+                    "character": 81
+                }
+            },
+            "rule": "reportAssignmentType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\db\\relational_db.py",
+            "severity": "error",
+            "message": "Return type of async generator function must be compatible with \"AsyncGenerator[AsyncSession, Any]\"\n┬á┬á\"AsyncGenerator[AsyncSession, Unknown, Unknown]\" is not assignable to \"AsyncSession\"",
+            "range": {
+                "start": {
+                    "line": 100,
+                    "character": 18
+                },
+                "end": {
+                    "line": 100,
+                    "character": 25
+                }
+            },
+            "rule": "reportReturnType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\db\\vector_db.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 13,
+                    "character": 5
+                },
+                "end": {
+                    "line": 13,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\main.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 21,
+                    "character": 5
+                },
+                "end": {
+                    "line": 21,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\main.py",
+            "severity": "error",
+            "message": "Import \"prometheus_fastapi_instrumentator\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 5
+                },
+                "end": {
+                    "line": 22,
+                    "character": 38
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 17,
+                    "character": 5
+                },
+                "end": {
+                    "line": 17,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Import \"ragas.testset.generator\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 18,
+                    "character": 5
+                },
+                "end": {
+                    "line": 18,
+                    "character": 28
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Import \"ragas.testset.evolutions\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 19,
+                    "character": 5
+                },
+                "end": {
+                    "line": 19,
+                    "character": 29
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"openai_api_key\" for class \"Settings\"\n┬á┬áAttribute \"openai_api_key\" is unknown",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 64
+                },
+                "end": {
+                    "line": 39,
+                    "character": 78
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"openai_api_key\" for class \"Settings\"\n┬á┬áAttribute \"openai_api_key\" is unknown",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 61
+                },
+                "end": {
+                    "line": 40,
+                    "character": 75
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\generate_testset.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"openai_api_key\" for class \"Settings\"\n┬á┬áAttribute \"openai_api_key\" is unknown",
+            "range": {
+                "start": {
+                    "line": 41,
+                    "character": 83
+                },
+                "end": {
+                    "line": 41,
+                    "character": 97
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Import \"pandas\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 18,
+                    "character": 7
+                },
+                "end": {
+                    "line": 18,
+                    "character": 13
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Import \"datasets\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 19,
+                    "character": 5
+                },
+                "end": {
+                    "line": 19,
+                    "character": 13
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 21,
+                    "character": 5
+                },
+                "end": {
+                    "line": 21,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Import \"ragas\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 5
+                },
+                "end": {
+                    "line": 22,
+                    "character": 10
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Import \"ragas.metrics\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 23,
+                    "character": 5
+                },
+                "end": {
+                    "line": 23,
+                    "character": 18
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "No overloads for \"__getitem__\" match the provided arguments",
+            "range": {
+                "start": {
+                    "line": 47,
+                    "character": 20
+                },
+                "end": {
+                    "line": 47,
+                    "character": 32
+                }
+            },
+            "rule": "reportCallIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Argument of type \"Literal['content']\" cannot be assigned to parameter \"s\" of type \"slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]\" in function \"__getitem__\"\n┬á┬á\"Literal['content']\" is not assignable to \"slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]\"",
+            "range": {
+                "start": {
+                    "line": 47,
+                    "character": 20
+                },
+                "end": {
+                    "line": 47,
+                    "character": 32
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Argument of type \"Literal['content']\" cannot be assigned to parameter \"key\" of type \"SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]\" in function \"__getitem__\"\n┬á┬áType \"Literal['content']\" is not assignable to type \"SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]\"\n┬á┬á┬á┬á\"Literal['content']\" is incompatible with protocol \"SupportsIndex\"\n┬á┬á┬á┬á┬á┬á\"__index__\" is not present\n┬á┬á┬á┬á\"Literal['content']\" is not assignable to \"slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]\"",
+            "range": {
+                "start": {
+                    "line": 47,
+                    "character": 20
+                },
+                "end": {
+                    "line": 47,
+                    "character": 32
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Object of type \"None\" is not subscriptable",
+            "range": {
+                "start": {
+                    "line": 47,
+                    "character": 20
+                },
+                "end": {
+                    "line": 47,
+                    "character": 21
+                }
+            },
+            "rule": "reportOptionalSubscript"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"openai_api_key\" for class \"Settings\"\n┬á┬áAttribute \"openai_api_key\" is unknown",
+            "range": {
+                "start": {
+                    "line": 75,
+                    "character": 59
+                },
+                "end": {
+                    "line": 75,
+                    "character": 73
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\rag_eval\\run_eval.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"openai_api_key\" for class \"Settings\"\n┬á┬áAttribute \"openai_api_key\" is unknown",
+            "range": {
+                "start": {
+                    "line": 76,
+                    "character": 83
+                },
+                "end": {
+                    "line": 76,
+                    "character": 97
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\workers\\celery_tasks.py",
+            "severity": "error",
+            "message": "Import \"celery\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 21,
+                    "character": 5
+                },
+                "end": {
+                    "line": 21,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        },
+        {
+            "file": "c:\\Users\\quang\\Downloads\\mcp-rag\\leave-request-mng\\rag-production-system\\workers\\celery_tasks.py",
+            "severity": "error",
+            "message": "Import \"loguru\" could not be resolved",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 5
+                },
+                "end": {
+                    "line": 22,
+                    "character": 11
+                }
+            },
+            "rule": "reportMissingImports"
+        }
+    ],
+    "summary": {
+        "filesAnalyzed": 26,
+        "errorCount": 42,
+        "warningCount": 0,
+        "informationCount": 0,
+        "timeInSec": 4.799
+    }
+}
+

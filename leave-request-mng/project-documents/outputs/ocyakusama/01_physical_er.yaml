@@ -1,0 +1,245 @@
+version: 1.0
+system: Mendix Leave Management System
+generated_from:
+  - Requirement Defination Document.md §3.2
+  - Domain Definition.md
+  - Code Definition.md
+  - Domain Glossary.md
+  - Business Rules.md
+
+conventions:
+  entity_naming: PascalCase singular         # Code Def §5
+  attribute_naming: PascalCase                # Code Def §5
+  audit_columns:
+    system_managed: [createdDate(flag), changedDate(flag)]   # hasCreatedDate / hasChangedDate flags on every entity
+    user_defined:   [version]                                 # optimistic lock; NOT on Administration.Account specializations
+  soft_delete_column: DeletedFlag
+  optimistic_locking: version
+  id_strategy:
+    Employee:     "EMP-{YYYY}-{5d}"           # Code Def §1
+    LeaveRequest: "LRQ-{YYYYMM}-{5d}"
+    LeaveType:    "LTP-{3d}"
+    Department:   "DEP-{3d}"
+    generator_entity: SystemCounter
+
+enumerations:
+  - name: Enum_LeaveStatus
+    values: [DRAFT, PENDING, APPROVED, REJECTED, CANCELLED]
+    source: "Domain Definition.md §1; Code Definition.md §2"
+    transition_rule: "DRAFT → PENDING → APPROVED|REJECTED; CANCELLED only from PENDING"
+    captions_ja: { DRAFT: 下書き, PENDING: 申請中, APPROVED: 承認済, REJECTED: 却下, CANCELLED: 取消 }
+  - name: Enum_Session
+    values: [FULL, AM, PM]
+    factor: { FULL: 1.0, AM: 0.5, PM: 0.5 }
+    source: "Code Definition.md §2"
+    captions_ja: { FULL: 全日, AM: 午前休, PM: 午後休 }
+  - name: Enum_UserRole
+    values: [Employee, Manager, HR_Admin]
+    source: "Domain Definition.md §1"
+    captions_ja: { Employee: 一般社員, Manager: 承認者, HR_Admin: 管理者 }
+
+entities:
+
+  - logical_name: Employee
+    logical_name_ja: 社員
+    physical_table: EMPLOYEE
+    type: master
+    source: "RDD §3.2; Code Definition.md §1"
+    extends: "Administration.Account (Mendix)"
+    notes:
+      - "Specializes Administration.Account. AccountGuid/FullName/Email are inherited from System.User/Administration.Account and MUST NOT be re-declared as user attributes."
+      - "CreatedDate, ChangedDate, CreatedBy, ChangedBy are inherited via system flags from the root ancestor — do NOT re-declare as user attributes on this entity."
+      - "XPath for current-user scoping: [id = '[%CurrentUser%]'] (direct, since this entity IS a System.User specialization)."
+    system_flags:
+      hasCreatedDate: true
+      hasChangedDate: true
+    attributes:
+      - { name: EmployeeId,        column: EMPLOYEE_ID,         type: String(20),    pk: true,  nullable: false, unique: true, description: "EMP-YYYY-#####" }
+      - { name: Role,              column: ROLE,                type: Enum_UserRole, nullable: false, default: Employee }
+      - { name: DepartmentId,      column: DEPARTMENT_ID,       type: String(10),    fk: Department.DepartmentId, nullable: true }
+      - { name: ManagerEmployeeId, column: MANAGER_EMPLOYEE_ID, type: String(20),    fk: Employee.EmployeeId,     nullable: true,  description: "self-reference" }
+      - { name: HireDate,          column: HIRE_DATE,           type: Date,          nullable: true }
+      - { name: ActiveFlag,        column: ACTIVE_FLAG,         type: Boolean,       nullable: false, default: true }
+      - { name: DeletedFlag,       column: DELETED_FLAG,        type: Boolean,       nullable: false, default: false }
+      - { name: Version,           column: VERSION,             type: Long,          nullable: false, default: 0 }
+    indexes:
+      - { name: IX_EMPLOYEE_DEPT,  columns: [DEPARTMENT_ID] }
+      - { name: IX_EMPLOYEE_MGR,   columns: [MANAGER_EMPLOYEE_ID] }
+
+  - logical_name: Department
+    logical_name_ja: 部署
+    physical_table: DEPARTMENT
+    type: master
+    source: "Code Definition.md §1 (DEP-### format)"
+    system_flags:
+      hasCreatedDate: true
+      hasChangedDate: true
+    attributes:
+      - { name: DepartmentId,   column: DEPARTMENT_ID,   type: String(10),  pk: true, description: "DEP-###" }
+      - { name: DepartmentName, column: DEPARTMENT_NAME, type: String(100), nullable: false }
+      - { name: ActiveFlag,     column: ACTIVE_FLAG,     type: Boolean,     nullable: false, default: true }
+    notes:
+      - "Entity inferred from ID format DEP-###. Confirm with HR whether department master is in-scope for V1 — see gap report."
+
+  - logical_name: LeaveType
+    logical_name_ja: 休暇種別
+    physical_table: LEAVE_TYPE
+    type: master
+    source: "Domain Definition.md §2.A; Code Definition.md §3"
+    system_flags:
+      hasCreatedDate: true
+      hasChangedDate: true
+    attributes:
+      - { name: LeaveTypeId,             column: LEAVE_TYPE_ID,             type: String(10),   pk: true,  description: "LTP-### or business code" }
+      - { name: Code,                    column: CODE,                      type: String(10),   nullable: false, unique: true, description: "AL/SL/UL/SPL/COM" }
+      - { name: NameEN,                  column: NAME_EN,                   type: String(80),   nullable: false }
+      - { name: NameJP,                  column: NAME_JP,                   type: String(80),   nullable: false }
+      - { name: IsPaid,                  column: IS_PAID,                   type: Boolean,      nullable: false }
+      - { name: DefaultYearlyAllocation, column: DEFAULT_YEARLY_ALLOCATION,  type: Decimal(5,1), nullable: true,  description: "nullable for UL (unlimited)" }
+      - { name: RequiresAttachmentOver2D,column: REQUIRES_ATTACHMENT_OVER_2D,type: Boolean,     nullable: false, default: false, source: "BR-08" }
+      - { name: SkipBalanceCheck,        column: SKIP_BALANCE_CHECK,        type: Boolean,      nullable: false, default: false, source: "BR-02 (UL skips check)" }
+      - { name: AllowBackdate,           column: ALLOW_BACKDATE,            type: Boolean,      nullable: false, default: false, source: "BR-03 (SL only)" }
+      - { name: MaxBackdateDays,         column: MAX_BACKDATE_DAYS,         type: Integer,      nullable: true,  default: 0,    source: "BR-03 (SL up to 3d)" }
+      - { name: ActiveFlag,              column: ACTIVE_FLAG,               type: Boolean,      nullable: false, default: true }
+    indexes:
+      - { name: UX_LEAVE_TYPE_CODE, columns: [CODE], unique: true }
+
+  - logical_name: LeaveBalance
+    logical_name_ja: 休暇残高
+    physical_table: LEAVE_BALANCE
+    type: transaction
+    source: "RDD §3.2; Domain Glossary (Entitlement / Carry-over)"
+    system_flags:
+      hasCreatedDate: true
+      hasChangedDate: true
+      hasOwner: true
+      hasChangedBy: true
+    attributes:
+      - { name: LeaveBalanceId,  column: LEAVE_BALANCE_ID, type: Long,        pk: true, generated: true }
+      - { name: EmployeeId,      column: EMPLOYEE_ID,      type: String(20),  fk: Employee.EmployeeId,   nullable: false }
+      - { name: LeaveTypeId,     column: LEAVE_TYPE_ID,    type: String(10),  fk: LeaveType.LeaveTypeId, nullable: false }
+      - { name: FiscalYear,      column: FISCAL_YEAR,      type: Integer,     nullable: false }
+      - { name: TotalDays,       column: TOTAL_DAYS,       type: Decimal(5,1),nullable: false, default: 0, description: "Entitlement (付与日数)" }
+      - { name: UsedDays,        column: USED_DAYS,        type: Decimal(5,1),nullable: false, default: 0 }
+      - { name: PendingDays,     column: PENDING_DAYS,     type: Decimal(5,1),nullable: false, default: 0, description: "sum of pending request days" }
+      - { name: CarryOver,       column: CARRY_OVER,       type: Decimal(5,1),nullable: false, default: 0, source: "BR-09" }
+      - { name: CarryOverExpiry, column: CARRY_OVER_EXPIRY,type: Date,        nullable: true,  source: "BR-09 (Mar-31)" }
+      - { name: AvailableDays,   column: AVAILABLE_DAYS,   type: Decimal(5,1),nullable: false, default: 0, description: "Computed: TotalDays + CarryOver - UsedDays - PendingDays" }
+      - { name: DeletedFlag,     column: DELETED_FLAG,     type: Boolean,     nullable: false, default: false }
+      - { name: Version,         column: VERSION,          type: Long,        nullable: false, default: 0 }
+    indexes:
+      - { name: UX_BALANCE_EMP_TYPE_YR, columns: [EMPLOYEE_ID, LEAVE_TYPE_ID, FISCAL_YEAR], unique: true }
+      - { name: IX_BALANCE_EMP,         columns: [EMPLOYEE_ID] }
+
+  - logical_name: LeaveRequest
+    logical_name_ja: 休暇申請
+    physical_table: LEAVE_REQUEST
+    type: transaction
+    source: "RDD §3.2; Code Definition.md §1, §2"
+    system_flags:
+      hasCreatedDate: true
+      hasChangedDate: true
+      hasOwner: true
+      hasChangedBy: true
+    attributes:
+      - { name: LeaveRequestId,     column: LEAVE_REQUEST_ID,     type: Long,             pk: true, generated: true }
+      - { name: RequestCode,        column: REQUEST_CODE,         type: String(20),        nullable: false, unique: true, immutable: true, description: "LRQ-YYYYMM-#####" }
+      - { name: OwnerEmployeeId,    column: OWNER_EMPLOYEE_ID,    type: String(20),        fk: Employee.EmployeeId,      nullable: false }
+      - { name: ApproverEmployeeId, column: APPROVER_EMPLOYEE_ID, type: String(20),        fk: Employee.EmployeeId,      nullable: true,  description: "Set on submit per org chart; BR-06 prohibits self" }
+      - { name: LeaveTypeId,        column: LEAVE_TYPE_ID,        type: String(10),        fk: LeaveType.LeaveTypeId,    nullable: false }
+      - { name: StartDate,          column: START_DATE,           type: Date,              nullable: false }
+      - { name: EndDate,            column: END_DATE,             type: Date,              nullable: false }
+      - { name: IsHalfDay,          column: IS_HALF_DAY,          type: Boolean,           nullable: false, default: false }
+      - { name: Session,            column: SESSION,              type: Enum_Session,      nullable: false, default: FULL }
+      - { name: TotalDays,          column: TOTAL_DAYS,           type: Decimal(5,1),      nullable: false, default: 0, description: "Calculated by SUB_CalculateDays (BR-04, BR-05)" }
+      - { name: Reason,             column: REASON,               type: String(500),       nullable: true }
+      - { name: Status,             column: STATUS,               type: Enum_LeaveStatus,  nullable: false, default: DRAFT }
+      - { name: ManagerComment,     column: MANAGER_COMMENT,      type: String(500),       nullable: true,  description: "Required when Status=REJECTED" }
+      - { name: SubmittedAt,        column: SUBMITTED_AT,         type: DateTime,          nullable: true }
+      - { name: DecidedAt,          column: DECIDED_AT,           type: DateTime,          nullable: true }
+      - { name: DeletedFlag,        column: DELETED_FLAG,         type: Boolean,           nullable: false, default: false }
+      - { name: Version,            column: VERSION,              type: Long,              nullable: false, default: 0 }
+    indexes:
+      - { name: UX_LR_CODE,            columns: [REQUEST_CODE],                              unique: true }
+      - { name: IX_LR_OWNER_STATUS,    columns: [OWNER_EMPLOYEE_ID, STATUS] }
+      - { name: IX_LR_APPROVER_STATUS, columns: [APPROVER_EMPLOYEE_ID, STATUS] }
+      - { name: IX_LR_DATES,           columns: [OWNER_EMPLOYEE_ID, START_DATE, END_DATE],   description: "BR-07 overlap check" }
+    state_machine:
+      transitions:
+        - { from: null,    to: DRAFT,     trigger: "Create from SCR-EMP-01" }
+        - { from: DRAFT,   to: PENDING,   trigger: "Submit (ACT_LeaveRequest_Submit)" }
+        - { from: PENDING, to: APPROVED,  trigger: "Manager Approve (ACT_LeaveRequest_Approve)" }
+        - { from: PENDING, to: REJECTED,  trigger: "Manager Reject (ACT_LeaveRequest_Reject)" }
+        - { from: PENDING, to: CANCELLED, trigger: "Owner cancel" }
+
+  - logical_name: RequestAttachment
+    logical_name_ja: 添付ファイル
+    physical_table: REQUEST_ATTACHMENT
+    type: transaction
+    source: "BR-08 (Sick Leave > 2d requires Medical Certificate)"
+    extends: "System.FileDocument (Mendix)"
+    notes:
+      - "Specializes System.FileDocument. The following spec columns are INHERITED and must NOT be re-declared as user attributes:"
+      - "  AttachmentId → use built-in Mendix id"
+      - "  FileName     → inherited as System.FileDocument.Name"
+      - "  FileBlob     → inherited as System.FileDocument.Contents"
+      - "  SizeBytes    → inherited as System.FileDocument.Size"
+      - "  HasContents  → auto-managed by runtime"
+      - "LeaveRequestId FK attribute is represented by the Attachment_LeaveRequest association (see relationships section) — do NOT re-declare as an attribute."
+    attributes:
+      - { name: ContentType, column: CONTENT_TYPE, type: String(120), nullable: true }
+      - { name: UploadedAt,  column: UPLOADED_AT,  type: DateTime,    nullable: false }
+      - { name: UploadedBy,  column: UPLOADED_BY,  type: String(36),  nullable: false }
+
+  - logical_name: RequestHistory
+    logical_name_ja: 申請履歴
+    physical_table: REQUEST_HISTORY
+    type: audit
+    source: "RDD §4.3 (audit trail mandatory for state transitions)"
+    attributes:
+      - { name: HistoryId,       column: HISTORY_ID,       type: Long,             pk: true, generated: true }
+      - { name: LeaveRequestId,  column: LEAVE_REQUEST_ID, type: Long,             fk: LeaveRequest.LeaveRequestId, nullable: false }
+      - { name: FromStatus,      column: FROM_STATUS,      type: Enum_LeaveStatus, nullable: true }
+      - { name: ToStatus,        column: TO_STATUS,        type: Enum_LeaveStatus, nullable: false }
+      - { name: ActorEmployeeId, column: ACTOR_EMPLOYEE_ID,type: String(20),       nullable: false }
+      - { name: Comment,         column: COMMENT,          type: String(500),      nullable: true }
+      - { name: EventAt,         column: EVENT_AT,         type: DateTime,         nullable: false }
+    indexes:
+      - { name: IX_HIST_REQ, columns: [LEAVE_REQUEST_ID] }
+
+  - logical_name: PublicHoliday
+    logical_name_ja: 祝日
+    physical_table: PUBLIC_HOLIDAY
+    type: master
+    source: "Domain Definition.md §2.B; BR-04"
+    attributes:
+      - { name: HolidayId,   column: HOLIDAY_ID,   type: Long,       pk: true, generated: true }
+      - { name: HolidayDate, column: HOLIDAY_DATE, type: Date,       nullable: false, unique: true }
+      - { name: NameEN,      column: NAME_EN,      type: String(80), nullable: false }
+      - { name: NameJP,      column: NAME_JP,      type: String(80), nullable: false }
+      - { name: Recurring,   column: RECURRING,    type: Boolean,    nullable: false, default: false }
+      - { name: ActiveFlag,  column: ACTIVE_FLAG,  type: Boolean,    nullable: false, default: true }
+    indexes:
+      - { name: UX_PH_DATE, columns: [HOLIDAY_DATE], unique: true }
+
+  - logical_name: SystemCounter
+    logical_name_ja: 採番カウンタ
+    physical_table: SYSTEM_COUNTER
+    type: system
+    source: "Code Definition.md §4 (sequential numbering)"
+    system_flags:
+      hasChangedDate: true
+    attributes:
+      - { name: CounterKey,   column: COUNTER_KEY,   type: String(40), pk: true,  description: "e.g., LRQ-202605 / EMP-2026" }
+      - { name: CurrentValue, column: CURRENT_VALUE, type: Long,       nullable: false, default: 0 }
+
+relationships:
+  - { from: Employee,          to: Department,  cardinality: "N:1", name: Employee_Department }
+  - { from: Employee,          to: Employee,    cardinality: "N:1", name: Employee_Manager,       notes: "self-ref" }
+  - { from: LeaveBalance,      to: Employee,    cardinality: "N:1", name: LeaveBalance_Employee }
+  - { from: LeaveBalance,      to: LeaveType,   cardinality: "N:1", name: LeaveBalance_LeaveType }
+  - { from: LeaveRequest,      to: Employee,    cardinality: "N:1", name: LeaveRequest_Owner }
+  - { from: LeaveRequest,      to: Employee,    cardinality: "N:1", name: LeaveRequest_Approver }
+  - { from: LeaveRequest,      to: LeaveType,   cardinality: "N:1", name: LeaveRequest_LeaveType }
+  - { from: RequestAttachment, to: LeaveRequest,cardinality: "N:1", name: Attachment_LeaveRequest }
+  - { from: RequestHistory,    to: LeaveRequest,cardinality: "N:1", name: History_LeaveRequest }

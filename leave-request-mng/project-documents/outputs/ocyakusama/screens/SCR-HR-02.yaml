@@ -1,0 +1,109 @@
+subsystem: LeaveManagement
+function_category: HR
+function: Master Data Maintenance
+screen_id: SCR-HR-02
+screen_name_en: Leave Type Master Data
+screen_name_ja: 休暇種別マスタ
+type: master_maintenance
+layout: full_page
+access_roles: [HR_Admin]
+source:
+  document: "Screen List.md / RDD §4.4 Modifiability"
+  section: "SCR-HR-02"
+
+primary_entities:
+  - LeaveType
+
+details:
+
+  - section: Toolbar
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "新規",     style: primary,   triggers_event: EVT_OnClick_New }
+      - { item_type: button, label_ja: "編集",     style: secondary, triggers_event: EVT_OnClick_Edit }
+      - { item_type: button, label_ja: "無効化",   style: danger,    triggers_event: EVT_OnClick_Deactivate }
+
+  - section: Grid
+    item_type: data_grid
+    table_column: LeaveType
+    columns:
+      - { table_column: LeaveType.Code,                     label_ja: "コード" }
+      - { table_column: LeaveType.NameEN,                   label_ja: "名称 (EN)" }
+      - { table_column: LeaveType.NameJP,                   label_ja: "名称 (JP)" }
+      - { table_column: LeaveType.IsPaid,                   label_ja: "有給",       display: "はい/いいえ" }
+      - { table_column: LeaveType.DefaultYearlyAllocation,  label_ja: "年次付与",   format: "#,##0.0" }
+      - { table_column: LeaveType.RequiresAttachmentOver2D, label_ja: "2日超で添付要", display: "はい/いいえ" }
+      - { table_column: LeaveType.ActiveFlag,               label_ja: "有効",       display: "はい/いいえ" }
+    selection_mode: single
+    page_size: 25
+
+  - section: EditForm
+    item_type: inline_form
+    table_column: LeaveType
+    fields:
+      - { item_type: text_box,        label_ja: "コード",       table_column: LeaveType.Code,                     required: true, max_length: 10, immutable_after_create: true }
+      - { item_type: text_box,        label_ja: "名称 (EN)",    table_column: LeaveType.NameEN,                   required: true, max_length: 80 }
+      - { item_type: text_box,        label_ja: "名称 (JP)",    table_column: LeaveType.NameJP,                   required: true, max_length: 80 }
+      - { item_type: check_box,       label_ja: "有給",         table_column: LeaveType.IsPaid,                   default: true }
+      - { item_type: text_box,        label_ja: "年次付与日数", table_column: LeaveType.DefaultYearlyAllocation,  format: "#,##0.0" }
+      - { item_type: check_box,       label_ja: "2日超で添付要",table_column: LeaveType.RequiresAttachmentOver2D, default: false }
+      - { item_type: check_box,       label_ja: "残高チェック省略", table_column: LeaveType.SkipBalanceCheck,     default: false }
+      - { item_type: check_box,       label_ja: "過去日許可",   table_column: LeaveType.AllowBackdate,            default: false }
+      - { item_type: text_box,        label_ja: "過去日最大日数",table_column: LeaveType.MaxBackdateDays,         conditional_visibility: "AllowBackdate == true" }
+      - { item_type: check_box,       label_ja: "有効",         table_column: LeaveType.ActiveFlag,               default: true }
+
+basic_validations:
+
+  - id: VAL-HR02-001
+    field: Code
+    rule: "required AND UNIQUE(Code)"
+    message: E001
+    source: "RDD §4.4 — master data integrity"
+
+  - id: VAL-HR02-002
+    field: NameJP
+    rule: required
+    message: E001
+    source: "RDD §3.3 UI in Japanese"
+
+  - id: VAL-HR02-003
+    field: DefaultYearlyAllocation
+    rule: "value IS NULL OR value >= 0"
+    message: E001
+    source: "Inferred — non-negative business rule"
+
+  - id: VAL-HR02-004
+    field: MaxBackdateDays
+    rule: "AllowBackdate == true ⇒ MaxBackdateDays > 0"
+    message: E001
+    source: "BR-03 (SL up to 3 days retroactively — example)"
+
+crud:
+  - { entity: LeaveType, operations: [C, R, U, D], source: "Screen List.md SCR-HR-02 CRUD interface" }
+  - { entity: LeaveBalance, operations: [R],      source: "Check usage before hard-delete; force soft-delete if referenced" }
+
+events:
+
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_LeaveType_List
+
+  - event_id: EVT_OnClick_New
+    trigger: button_click
+    action: ACT_LeaveType_OpenNew
+
+  - event_id: EVT_OnClick_Edit
+    trigger: button_click
+    action: ACT_LeaveType_OpenEdit
+    description: "Code field becomes read-only after first commit (immutable identifier)."
+
+  - event_id: EVT_OnClick_Save
+    trigger: button_click
+    action: ACT_LeaveType_Save
+    description: "Persist LeaveType with audit columns."
+
+  - event_id: EVT_OnClick_Deactivate
+    trigger: button_click
+    action: ACT_LeaveType_Deactivate
+    pre_messages: [C004]
+    description: "Set ActiveFlag=false (soft delete). Existing requests retain reference."

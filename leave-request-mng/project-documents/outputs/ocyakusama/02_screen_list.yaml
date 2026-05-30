@@ -1,0 +1,171 @@
+version: 1.0
+system: Mendix Leave Management System
+generated_from:
+  - Screen List.md
+  - Screen Flow Specification.md
+  - Requirement Defination Document.md §3.1, §3.3
+
+subsystem: LeaveManagement
+function_categories:
+  - { id: EMP, name_en: "Employee Self-Service",       name_ja: "社員セルフサービス" }
+  - { id: MGR, name_en: "Manager Approval Workflow",   name_ja: "上司承認ワークフロー" }
+  - { id: HR,  name_en: "HR / Admin Configuration",    name_ja: "人事管理" }
+
+screens:
+
+  - screen_id: SCR-EMP-01
+    screen_name_en: Employee Dashboard
+    screen_name_ja: 社員ダッシュボード
+    function_category: EMP
+    function: UC-01 View Leave Dashboard
+    type: dashboard
+    layout: full_page
+    access_roles: [Employee]
+    primary_entities: [LeaveBalance, LeaveRequest]
+    description: "Landing page; balance cards (Data View) + personal request history (List View)."
+    source:
+      document: "Screen List.md"
+      section: "SCR-EMP-01"
+
+  - screen_id: SCR-EMP-02
+    screen_name_en: Leave Request Form
+    screen_name_ja: 休暇申請フォーム
+    function_category: EMP
+    function: UC-02 Submit Leave Request
+    type: entry
+    layout: popup_modal
+    access_roles: [Employee]
+    primary_entities: [LeaveRequest, RequestAttachment]
+    description: "Create / edit LeaveRequest. Conditional fields for half-day session and attachment (BR-08)."
+    open_modes: [create, edit]
+    edit_precondition: "LeaveRequest.Status IN (DRAFT, REJECTED)"
+    source:
+      document: "Screen List.md / Screen Flow Specification.md §3"
+      section: "SCR-EMP-02"
+
+  - screen_id: SCR-EMP-03
+    screen_name_en: Request Detail View
+    screen_name_ja: 申請詳細表示
+    function_category: EMP
+    function: UC-02/UC-03 (Owner View)
+    type: detail
+    layout: popup_readonly
+    access_roles: [Employee]
+    primary_entities: [LeaveRequest, RequestHistory]
+    description: "Read-only detail with Manager comment & history."
+    source:
+      document: "Screen List.md"
+      section: "SCR-EMP-03"
+
+  - screen_id: SCR-MGR-01
+    screen_name_en: Manager Approval Dashboard
+    screen_name_ja: 承認ダッシュボード
+    function_category: MGR
+    function: UC-03 Process Leave Request
+    type: list
+    layout: full_page
+    access_roles: [Manager]
+    primary_entities: [LeaveRequest]
+    description: "Data Grid of Pending requests filtered by Approver=[%CurrentUser%]. Search/filter."
+    xpath_constraint: "[LeaveManagement.LeaveRequest_Approver = '[%CurrentUser%]' and Status = 'PENDING']"
+    source:
+      document: "Screen List.md / RDD §3.3"
+      section: "SCR-MGR-01"
+
+  - screen_id: SCR-MGR-02
+    screen_name_en: Approval Action Dialog
+    screen_name_ja: 承認アクションダイアログ
+    function_category: MGR
+    function: UC-03 Process Leave Request
+    type: detail
+    layout: popup_modal
+    access_roles: [Manager]
+    primary_entities: [LeaveRequest]
+    description: "Review one request; Approve / Reject; ManagerComment required on reject."
+    open_precondition: "LeaveRequest.Status = PENDING"
+    source:
+      document: "Screen List.md / Screen Flow Specification.md §3"
+      section: "SCR-MGR-02"
+
+  - screen_id: SCR-HR-01
+    screen_name_en: HR Overview Dashboard
+    screen_name_ja: 人事概要ダッシュボード
+    function_category: HR
+    function: HR Analytics
+    type: dashboard
+    layout: full_page
+    access_roles: [HR_Admin]
+    primary_entities: [LeaveRequest, LeaveBalance, Employee]
+    description: "Company-wide analytics: daily absences, leave trend, resource utilisation."
+    source:
+      document: "Screen List.md"
+      section: "SCR-HR-01"
+
+  - screen_id: SCR-HR-02
+    screen_name_en: Leave Type Master Data
+    screen_name_ja: 休暇種別マスタ
+    function_category: HR
+    function: Master Data Maintenance
+    type: master_maintenance
+    layout: full_page
+    access_roles: [HR_Admin]
+    primary_entities: [LeaveType]
+    description: "CRUD on LeaveType (AL/SL/UL/SPL/COM) & default allocations."
+    source:
+      document: "Screen List.md"
+      section: "SCR-HR-02"
+
+  - screen_id: SCR-HR-03
+    screen_name_en: Employee Balance Manager
+    screen_name_ja: 社員残高管理
+    function_category: HR
+    function: Balance Adjustment
+    type: master_maintenance
+    layout: full_page
+    access_roles: [HR_Admin]
+    primary_entities: [LeaveBalance, Employee]
+    description: "Bulk import via Excel Importer + manual adjustment per employee."
+    source:
+      document: "Screen List.md / RDD §5"
+      section: "SCR-HR-03"
+
+  - screen_id: SCR-HR-04
+    screen_name_en: Audit & Export Reports
+    screen_name_ja: 監査・エクスポート
+    function_category: HR
+    function: Audit & Reporting
+    type: report
+    layout: full_page
+    access_roles: [HR_Admin]
+    primary_entities: [LeaveRequest, RequestHistory]
+    description: "System-wide history grid with advanced filters; Export to Excel for payroll."
+    source:
+      document: "Screen List.md"
+      section: "SCR-HR-04"
+
+transitions:
+  - { from: AUTH,         to: SCR-EMP-01, trigger: "Login as Employee",  type: navigate, source: "Screen Flow §1" }
+  - { from: AUTH,         to: SCR-MGR-01, trigger: "Login as Manager",   type: navigate, source: "Screen Flow §1" }
+  - { from: AUTH,         to: SCR-HR-01,  trigger: "Login as HR_Admin",  type: navigate, source: "Screen Flow §1" }
+  - { from: SCR-EMP-01,   to: SCR-EMP-02, trigger: "Click New Request",  type: popup_modal,   source: "Screen Flow §2.A" }
+  - { from: SCR-EMP-02,   to: SCR-EMP-01, trigger: "Submit (Success)",   type: close_refresh, source: "Screen Flow §2.A" }
+  - { from: SCR-EMP-01,   to: SCR-EMP-03, trigger: "Select history row", type: popup_readonly,source: "Screen Flow §2.A" }
+  - { from: SCR-EMP-03,   to: SCR-EMP-01, trigger: "Close",              type: close,         source: "Screen Flow §2.A" }
+  - { from: SCR-MGR-01,   to: SCR-MGR-02, trigger: "Select Pending row", type: popup_modal,   source: "Screen Flow §2.B" }
+  - { from: SCR-MGR-02,   to: SCR-MGR-01, trigger: "Approve / Reject",   type: close_refresh, source: "Screen Flow §2.B" }
+  - { from: SCR-HR-01,    to: SCR-HR-02,  trigger: "Sidebar Leave Types",     type: navigate, source: "Screen Flow §2.C" }
+  - { from: SCR-HR-01,    to: SCR-HR-03,  trigger: "Sidebar Employee Balances",type: navigate, source: "Screen Flow §2.C" }
+  - { from: SCR-HR-01,    to: SCR-HR-04,  trigger: "Sidebar Reports",         type: navigate, source: "Screen Flow §2.C" }
+  - { from: SCR-HR-02,    to: SCR-HR-01,  trigger: "Sidebar Dashboard",       type: navigate, source: "Screen Flow §2.C" }
+  - { from: SCR-HR-03,    to: SCR-HR-01,  trigger: "Sidebar Dashboard",       type: navigate, source: "Screen Flow §2.C" }
+  - { from: SCR-HR-04,    to: SCR-HR-01,  trigger: "Sidebar Dashboard",       type: navigate, source: "Screen Flow §2.C" }
+
+screen_to_function_matrix:
+  UC-01_ViewLeaveDashboard:   [SCR-EMP-01]
+  UC-02_SubmitLeaveRequest:   [SCR-EMP-01, SCR-EMP-02, SCR-EMP-03]
+  UC-03_ProcessLeaveRequest:  [SCR-MGR-01, SCR-MGR-02]
+  UC-04_AutomatedBalanceCalc: []   # background; no dedicated screen — triggered by SCR-EMP-02 submit & SCR-MGR-02 decide
+  HR_MasterData:              [SCR-HR-02]
+  HR_BalanceAdmin:            [SCR-HR-03]
+  HR_AuditExport:             [SCR-HR-04]
+  HR_Analytics:               [SCR-HR-01]

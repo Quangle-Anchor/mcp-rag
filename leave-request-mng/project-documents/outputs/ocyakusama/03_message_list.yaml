@@ -1,0 +1,253 @@
+version: 1.0
+system: Mendix Leave Management System
+generated_from:
+  - Business Rules.md (BR-01 .. BR-10)
+  - Domain Definition.md §3 Logic Constraints
+  - Requirement Defination Document.md §3, §4.3
+  - Screen Flow Specification.md §3
+
+conventions:
+  code_format:
+    E: Error
+    W: Warning
+    I: Information
+    C: Confirmation
+  variables: "{placeholders} are resolved at runtime (e.g., {available}, {requested})"
+
+messages:
+
+  # ---------- E: Error (validation / blocking) ----------
+  - code: E001
+    severity: Error
+    category: Validation
+    text_en: "Required field is missing: {field}."
+    text_ja: "{field}は必須項目です。"
+    source: "Generic — applied to all required attributes (RDD §3.1)"
+    applies_to: [SCR-EMP-02, SCR-MGR-02, SCR-HR-02, SCR-HR-03]
+
+  - code: E002
+    severity: Error
+    category: Validation
+    text_en: "End date must be on or after start date."
+    text_ja: "終了日は開始日以降の日付を指定してください。"
+    source: "RDD §2.2; standard date range rule"
+    applies_to: [SCR-EMP-02]
+
+  - code: E003
+    severity: Error
+    category: Validation
+    text_en: "Leave requests (except Sick Leave) must be submitted at least 2 business days before the start date."
+    text_ja: "病気休暇以外の申請は、開始日の2営業日前までに提出してください。"
+    source: "Business Rules BR-01"
+    applies_to: [SCR-EMP-02]
+
+  - code: E004
+    severity: Error
+    category: Validation
+    text_en: "Insufficient balance. Requested {requested} day(s); available {available} day(s)."
+    text_ja: "残高不足です。申請日数 {requested}、利用可能 {available}。"
+    source: "Business Rules BR-02; Domain Def §3 Zero-Balance Constraint"
+    applies_to: [SCR-EMP-02]
+
+  - code: E005
+    severity: Error
+    category: Validation
+    text_en: "Backdated requests are not permitted for this leave type."
+    text_ja: "この休暇種別では過去日の申請はできません。"
+    source: "Business Rules BR-03"
+    applies_to: [SCR-EMP-02]
+
+  - code: E006
+    severity: Error
+    category: Validation
+    text_en: "Sick Leave can be backdated by up to 3 days only."
+    text_ja: "病気休暇の遡及申請は3日以内に限ります。"
+    source: "Business Rules BR-03 (exception)"
+    applies_to: [SCR-EMP-02]
+
+  - code: E007
+    severity: Error
+    category: Workflow
+    text_en: "You cannot approve your own request."
+    text_ja: "自分の申請を承認することはできません。"
+    source: "Business Rules BR-06"
+    applies_to: [SCR-MGR-02]
+
+  - code: E008
+    severity: Error
+    category: Validation
+    text_en: "The requested period overlaps with another Pending or Approved request."
+    text_ja: "指定期間は既存の申請（申請中/承認済）と重複しています。"
+    source: "Business Rules BR-07"
+    applies_to: [SCR-EMP-02]
+
+  - code: E009
+    severity: Error
+    category: Validation
+    text_en: "A Medical Certificate is required for Sick Leave exceeding 2 consecutive days."
+    text_ja: "2日を超える病気休暇には医療証明書（添付）が必要です。"
+    source: "Business Rules BR-08"
+    applies_to: [SCR-EMP-02]
+
+  - code: E010
+    severity: Error
+    category: Workflow
+    text_en: "This request is locked. Approved/Rejected requests cannot be modified."
+    text_ja: "承認済または却下済の申請は変更できません。"
+    source: "Business Rules BR-10; Screen Flow §3 State-Based Access"
+    applies_to: [SCR-EMP-02, SCR-EMP-03]
+
+  - code: E011
+    severity: Error
+    category: Workflow
+    text_en: "Manager comment is required when rejecting a request."
+    text_ja: "却下時はコメントの入力が必須です。"
+    source: "Business Rules / Code Def §2 (REJECTED requires ManagerComment); RDD UC-03"
+    applies_to: [SCR-MGR-02]
+
+  - code: E012
+    severity: Error
+    category: Validation
+    text_en: "Status transition not allowed: {from} → {to}."
+    text_ja: "ステータス遷移は許可されていません: {from} → {to}。"
+    source: "Domain Def §3 Status Transition Rule"
+    applies_to: [SCR-MGR-02, SCR-EMP-02]
+
+  - code: E013
+    severity: Error
+    category: System
+    text_en: "Failed to generate Request Code. Please retry."
+    text_ja: "申請番号の採番に失敗しました。再試行してください。"
+    source: "Code Definition.md §4 (SystemCounter contention)"
+    applies_to: [SCR-EMP-02]
+
+  - code: E014
+    severity: Error
+    category: Security
+    text_en: "You are not authorized to view or modify this record."
+    text_ja: "この申請を参照／変更する権限がありません。"
+    source: "RDD §4.3 XPath constraints"
+    applies_to: [SCR-EMP-03, SCR-MGR-02, SCR-HR-03]
+
+  - code: E015
+    severity: Error
+    category: Validation
+    text_en: "Total day count must be greater than zero (the period contains only weekends/holidays)."
+    text_ja: "対象期間に営業日が含まれていません（土日祝のみ）。"
+    source: "Business Rules BR-04 (after holiday exclusion)"
+    applies_to: [SCR-EMP-02]
+
+  - code: E016
+    severity: Error
+    category: Validation
+    text_en: "Reason exceeds maximum length of 500 characters."
+    text_ja: "理由は500文字以内で入力してください。"
+    source: "Inferred from LeaveRequest.Reason length"
+    applies_to: [SCR-EMP-02]
+
+  # ---------- W: Warning (non-blocking) ----------
+  - code: W001
+    severity: Warning
+    category: Calculation
+    text_en: "Half-day toggle ON: total day count fixed to 0.5 regardless of date range."
+    text_ja: "半休が選択されています。期間に関わらず日数は0.5になります。"
+    source: "Business Rules BR-05"
+    applies_to: [SCR-EMP-02]
+
+  - code: W002
+    severity: Warning
+    category: Expiry
+    text_en: "Carry-over days expire on March 31. Remaining carry-over: {carryover} day(s)."
+    text_ja: "繰越休暇は3月31日に失効します。残繰越日数: {carryover}日。"
+    source: "Business Rules BR-09"
+    applies_to: [SCR-EMP-01]
+
+  - code: W003
+    severity: Warning
+    category: Coverage
+    text_en: "No direct manager is set for the requester. Routing to HR for approval."
+    text_ja: "上司未設定のため、人事にエスカレーションされます。"
+    source: "Inferred from BR-06 (escalation path)"
+    applies_to: [SCR-EMP-02]
+
+  # ---------- I: Information (success / status) ----------
+  - code: I001
+    severity: Information
+    category: Workflow
+    text_en: "Request {requestCode} submitted successfully."
+    text_ja: "申請（{requestCode}）を提出しました。"
+    source: "RDD §2.2 step 3 (notification trigger)"
+    applies_to: [SCR-EMP-02]
+
+  - code: I002
+    severity: Information
+    category: Workflow
+    text_en: "Request {requestCode} approved. Balance updated."
+    text_ja: "申請（{requestCode}）を承認しました。残高を更新しました。"
+    source: "RDD §2.2 step 5"
+    applies_to: [SCR-MGR-02]
+
+  - code: I003
+    severity: Information
+    category: Workflow
+    text_en: "Request {requestCode} rejected."
+    text_ja: "申請（{requestCode}）を却下しました。"
+    source: "RDD §2.2 step 5"
+    applies_to: [SCR-MGR-02]
+
+  - code: I004
+    severity: Information
+    category: Workflow
+    text_en: "Draft saved."
+    text_ja: "下書きを保存しました。"
+    source: "Inferred from Status=DRAFT (Code Def §2)"
+    applies_to: [SCR-EMP-02]
+
+  - code: I005
+    severity: Information
+    category: System
+    text_en: "Export completed: {count} record(s)."
+    text_ja: "エクスポートが完了しました（{count}件）。"
+    source: "Screen List.md (SCR-HR-04 export feature)"
+    applies_to: [SCR-HR-04]
+
+  - code: I006
+    severity: Information
+    category: System
+    text_en: "Excel import completed: {success} succeeded, {failed} failed."
+    text_ja: "Excelインポートが完了しました（成功: {success}, 失敗: {failed}）。"
+    source: "RDD §5 Data Migration"
+    applies_to: [SCR-HR-03]
+
+  # ---------- C: Confirmation (popups) ----------
+  - code: C001
+    severity: Confirmation
+    category: Workflow
+    text_en: "Approve this request?"
+    text_ja: "この申請を承認しますか？"
+    source: "Inferred — irreversible action (BR-10)"
+    applies_to: [SCR-MGR-02]
+
+  - code: C002
+    severity: Confirmation
+    category: Workflow
+    text_en: "Reject this request? A comment is required."
+    text_ja: "この申請を却下しますか？コメントを入力してください。"
+    source: "Inferred — BR-10 + comment requirement"
+    applies_to: [SCR-MGR-02]
+
+  - code: C003
+    severity: Confirmation
+    category: Workflow
+    text_en: "Cancel this request? This cannot be undone."
+    text_ja: "この申請を取り消しますか？取り消し後は元に戻せません。"
+    source: "Inferred — Code Def §2 CANCELLED is irreversible"
+    applies_to: [SCR-EMP-03]
+
+  - code: C004
+    severity: Confirmation
+    category: Master
+    text_en: "Deactivate this leave type? Existing requests will not be affected."
+    text_ja: "この休暇種別を無効化しますか？既存申請には影響しません。"
+    source: "Inferred — soft-delete pattern for masters"
+    applies_to: [SCR-HR-02]

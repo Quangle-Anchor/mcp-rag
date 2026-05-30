@@ -1,0 +1,111 @@
+subsystem: LeaveManagement
+function_category: HR
+function: Audit & Reporting
+screen_id: SCR-HR-04
+screen_name_en: Audit & Export Reports
+screen_name_ja: 監査・エクスポート
+type: report
+layout: full_page
+access_roles: [HR_Admin]
+source:
+  document: "Screen List.md / RDD §4.3 audit trail"
+  section: "SCR-HR-04"
+
+primary_entities:
+  - LeaveRequest
+  - RequestHistory
+  - Employee
+
+details:
+
+  - section: FilterBar
+    item_type: filter_bar
+    fields:
+      - { item_type: text_box,    label_ja: "申請番号",  table_column: filter.RequestCode,    operator: contains }
+      - { item_type: drop_down,   label_ja: "申請者",    table_column: filter.OwnerEmployeeId,
+          datasource: "Employee where ActiveFlag=true", display: FullName }
+      - { item_type: drop_down,   label_ja: "部署",      table_column: filter.DepartmentId,
+          datasource: "Department where ActiveFlag=true", display: DepartmentName }
+      - { item_type: drop_down,   label_ja: "休暇種別",  table_column: filter.LeaveTypeId,
+          datasource: "LeaveType", display: NameJP }
+      - { item_type: drop_down,   label_ja: "ステータス",table_column: filter.Status,
+          options_source: Enum_LeaveStatus, multiple: true }
+      - { item_type: date_picker, label_ja: "申請期間 開始", table_column: filter.SubmittedFrom }
+      - { item_type: date_picker, label_ja: "申請期間 終了", table_column: filter.SubmittedTo }
+      - { item_type: button,      label_ja: "検索",      style: primary,   triggers_event: EVT_OnClick_Search }
+      - { item_type: button,      label_ja: "クリア",    style: tertiary,  triggers_event: EVT_OnClick_ClearFilter }
+
+  - section: Toolbar
+    item_type: button_bar
+    buttons:
+      - { item_type: button, label_ja: "Excelエクスポート", style: primary, triggers_event: EVT_OnClick_Export }
+
+  - section: Grid
+    item_type: data_grid
+    table_column: LeaveRequest
+    columns:
+      - { table_column: LeaveRequest.RequestCode,        label_ja: "申請番号" }
+      - { table_column: Employee.EmployeeId,             label_ja: "社員番号" }
+      - { table_column: Employee.FullName,               label_ja: "氏名" }
+      - { table_column: Department.DepartmentName,       label_ja: "部署" }
+      - { table_column: LeaveType.NameJP,                label_ja: "休暇種別" }
+      - { table_column: LeaveRequest.StartDate,          label_ja: "開始日",   format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.EndDate,            label_ja: "終了日",   format: "yyyy/MM/dd" }
+      - { table_column: LeaveRequest.TotalDays,          label_ja: "日数",     format: "#,##0.0" }
+      - { table_column: LeaveRequest.Status,             label_ja: "ステータス", display: enum_caption_ja }
+      - { table_column: LeaveRequest.SubmittedAt,        label_ja: "申請日時", format: "yyyy/MM/dd HH:mm" }
+      - { table_column: LeaveRequest.DecidedAt,          label_ja: "決裁日時", format: "yyyy/MM/dd HH:mm" }
+      - { item_type: button,                             label_ja: "履歴",     triggers_event: EVT_OnClick_ShowHistory }
+    default_sort: { column: SubmittedAt, direction: DESC }
+    page_size: 50
+    selection_mode: single
+
+  - section: HistoryDrawer
+    item_type: side_drawer
+    table_column: RequestHistory
+    visibility: "$showHistory == true"
+    columns:
+      - { table_column: RequestHistory.EventAt,         label_ja: "日時",       format: "yyyy/MM/dd HH:mm" }
+      - { table_column: RequestHistory.FromStatus,      label_ja: "前",         display: enum_caption_ja }
+      - { table_column: RequestHistory.ToStatus,        label_ja: "後",         display: enum_caption_ja }
+      - { table_column: RequestHistory.ActorEmployeeId, label_ja: "実施者" }
+      - { table_column: RequestHistory.Comment,         label_ja: "コメント" }
+
+basic_validations:
+
+  - id: VAL-HR04-001
+    field: [filter.SubmittedFrom, filter.SubmittedTo]
+    rule: "filter.SubmittedTo IS NULL OR filter.SubmittedFrom IS NULL OR filter.SubmittedFrom <= filter.SubmittedTo"
+    message: E002
+    source: "Standard date range rule"
+
+crud:
+  - { entity: LeaveRequest,   operations: [R], source: "Screen List.md SCR-HR-04 audit grid" }
+  - { entity: RequestHistory, operations: [R], source: "RDD §4.3" }
+  - { entity: Employee,       operations: [R], source: "Join for display" }
+  - { entity: LeaveType,      operations: [R], source: "Filter & display" }
+
+events:
+
+  - event_id: EVT_OnLoad
+    trigger: page_load
+    action: DS_HR_AuditList
+
+  - event_id: EVT_OnClick_Search
+    trigger: button_click
+    action: refresh_grid_with_filters
+
+  - event_id: EVT_OnClick_ClearFilter
+    trigger: button_click
+    action: reset_filter_state
+
+  - event_id: EVT_OnClick_ShowHistory
+    trigger: button_click
+    action: ACT_RequestHistory_LoadForRequest
+
+  - event_id: EVT_OnClick_Export
+    trigger: button_click
+    action: ACT_LeaveRequest_ExportExcel
+    description: "Export current filtered set via Excel Exporter (RDD §5 / Screen List SCR-HR-04)."
+    post_messages: [I005]
+    error_messages: [E014]
