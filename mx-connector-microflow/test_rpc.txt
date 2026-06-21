@@ -1,3 +1,0 @@
-{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"configure_token","arguments":{"token":"7c6RqnF2r6TJus4jhu3PLYttTRjsMEUegJRNn7q3hkkSEPy6CCDcJXT3zj5pRf2wPFS6BT4TJao942kjkpXVyfW2fB66v3AZX5Lx"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"configure_app","arguments":{"appId":"7cef44f9-4ef7-4f3a-97b7-c5c95d15f172"}}}
-{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"open_working_copy","arguments":{}}}
