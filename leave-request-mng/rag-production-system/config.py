@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     # Comma-separated list of extra directories (absolute paths) to scan.
     docs_extra_dirs: str = ""
 
+    # ── Hybrid Search (BM25 + Dense + RRF Fusion) ────────────────────────────
+    bm25_weight: float = Field(0.4, ge=0.0, le=1.0, description="BM25 contribution in RRF fusion")
+    dense_weight: float = Field(0.6, ge=0.0, le=1.0, description="Dense vector contribution in RRF fusion")
+    rrf_k: int = Field(60, ge=1, description="RRF constant (standard=60)")
+    keyword_boost: float = Field(10.0, ge=0.0, description="Score boost for exact ID matches in query")
+    enable_self_reflection: bool = Field(True, description="Auto-retry with rewritten query if context insufficient")
+    max_retrieval_attempts: int = Field(2, ge=1, le=3, description="Max retrieval attempts (1 original + retries)")
+    bm25_index_path: str = str(BASE_DIR / "data" / "bm25_index.pkl")
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

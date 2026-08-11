@@ -195,11 +195,16 @@ def sync_all_documents_task(self, namespace: str | None = None) -> dict:
     self.update_state(state="STARTED", meta={"stage": "uploading", "total": total})
     uploaded = _batched_upsert(all_chunks, "full_sync", namespace=target_ns)
 
+    # Build BM25 index for hybrid search
+    logger.info("[SYNC] Building BM25 keyword index...")
+    from core.retrieval.bm25_index import build_and_persist_bm25
+    build_and_persist_bm25(all_chunks)
+
     result = {
         "chunks_synced": uploaded,
         "total_chunks": total,
         "namespace": target_ns,
-        "message": f"Successfully synced {uploaded}/{total} chunks to namespace '{target_ns}'.",
+        "message": f"Successfully synced {uploaded}/{total} chunks to namespace '{target_ns}' + BM25 index.",
     }
     logger.info("[SYNC DONE] {}", result["message"])
     return result

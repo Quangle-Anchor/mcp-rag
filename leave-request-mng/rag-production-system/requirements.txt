@@ -43,5 +43,8 @@ flower>=2.0.1
 loguru>=0.7.2
 prometheus-fastapi-instrumentator>=6.1.0
 
+# ── Hybrid Search ─────────────────────────────────────────────────────────────
+rank-bm25>=0.2.2         # BM25 keyword search for hybrid retrieval (RRF fusion)
+
 # ── Resilience / Retry ────────────────────────────────────────────────────────
 tenacity>=8.3.0          # @retry decorator for Gemini 429 rate-limit back-off

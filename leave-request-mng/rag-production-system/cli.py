@@ -192,8 +192,14 @@ def _run_sync(namespace_arg: str | None = None) -> None:
     )
     uploaded = _batched_upsert_cli(all_chunks, vs, "sync")
 
+    # ── Build BM25 index for hybrid search ────────────────────────────────────
+    logger.info("Step 4/4 — Building BM25 keyword index...")
+    from core.retrieval.bm25_index import build_and_persist_bm25
+    bm25_idx = build_and_persist_bm25(all_chunks)
+    logger.info("  BM25 index: {} chunks indexed.", len(all_chunks))
+
     logger.info("=" * 60)
-    logger.info("✅  SYNC COMPLETE: {}/{} chunks → namespace '{}'.",
+    logger.info("✅  SYNC COMPLETE: {}/{} chunks → namespace '{}' + BM25 index.",
                 uploaded, total, chosen_namespace)
     logger.info("=" * 60)
 
