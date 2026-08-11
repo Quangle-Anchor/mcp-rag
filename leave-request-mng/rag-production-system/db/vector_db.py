@@ -1,9 +1,7 @@
 """
-db/vector_db.py — Pinecone vector store wrapper with multi-namespace support.
+db/vector_db.py — Pinecone vector store wrapper.
 
-Supports dynamic namespace selection so the retriever can query
-different namespaces (e.g., mendix-docs for business context,
-mx-tools-agent-microflow for tool specs) within the same index.
+Supports configurable namespace via settings or explicit parameter.
 """
 from __future__ import annotations
 
@@ -27,7 +25,7 @@ def get_vector_store(namespace: str | None = None) -> PineconeVectorStore:
     Return a PineconeVectorStore for the given namespace.
 
     Instances are cached per-namespace. If namespace is None,
-    falls back to settings.pinecone_namespace (default: mendix-docs).
+    falls back to settings.pinecone_namespace (default: 'documents').
     """
     os.environ.setdefault("PINECONE_API_KEY", settings.pinecone_api_key)
     ns = namespace or settings.pinecone_namespace
@@ -55,10 +53,8 @@ def get_retriever(
 
     Args:
         top_k:           Number of chunks to retrieve.
-        namespace:       Pinecone namespace to query. None = default (mendix-docs).
-        metadata_filter: Dynamic Pinecone metadata filter dict, e.g.:
-                         {"tool_name": {"$in": ["create_microflow"]}, "data_type": "tool_spec"}
-                         {"layer": 3}
+        namespace:       Pinecone namespace. None = default from settings.
+        metadata_filter: Optional Pinecone metadata filter dict.
 
     Returns:
         A LangChain VectorStoreRetriever.
@@ -72,7 +68,3 @@ def get_retriever(
         logger.debug("Retriever: namespace='{}' | filter={}", namespace, metadata_filter)
 
     return store.as_retriever(search_kwargs=search_kwargs)
-"""
-Description: Upgraded from singleton cache to multi-namespace dict cache.
-get_retriever() now accepts namespace + dynamic metadata_filter instead of just layer_filter.
-"""

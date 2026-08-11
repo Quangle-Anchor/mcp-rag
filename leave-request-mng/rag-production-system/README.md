@@ -297,20 +297,17 @@ Client → GET /api/v1/upload-doc/status/{task_id} → status ────┘
 ## 🚀 Khởi động nhanh
 
 ```bash
-# 1. Copy .env
-cp .env.example .env
-# Điền GOOGLE_API_KEY và PINECONE_API_KEY
+#1 Tạo và kích hoạt môi trường ảo Python
+python3 -m venv .venv
+source .venv/bin/activate
 
-# 2. Cài đặt
+# 2. Cài đặt các thư viện phụ thuộc
 pip install -r requirements.txt
 
 # 3. Redis (cho Celery)
 docker run -p 6379:6379 redis:7-alpine
 
-# 4. Celery worker
-celery -A workers.celery_tasks worker --loglevel=info
-
-# 5. API server
+# 4. API server
 python main.py   # http://localhost:8000
 
 # 6. Swagger UI

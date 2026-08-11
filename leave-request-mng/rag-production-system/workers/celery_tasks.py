@@ -1,17 +1,9 @@
 """
 workers/celery_tasks.py — Background tasks for document ingestion and full re-sync.
 
-Two tasks matching rag_system.py operations:
-
-  ingest_document_task   — Single file: load → classify → chunk → embed → upsert
-  sync_all_documents_task — Full re-sync: delete namespace → re-index all Output dirs
-                            (mirrors sync_mendix_context() from rag_system.py)
-
-Key implementation details preserved from rag_system.py:
-  - Batched upload: BATCH_SIZE = 20 chunks per Pinecone call
-  - Retry per batch: 3 attempts, exponential backoff 5 s / 10 s
-  - Namespace delete before full re-sync
-  - Rate-limited CustomGeminiEmbeddings (1.5 s sleep between embeds)
+Two tasks:
+  ingest_document_task   — Single file: load → chunk → embed → upsert
+  sync_all_documents_task — Full re-sync: delete namespace → re-index all docs
 """
 from __future__ import annotations
 
@@ -45,15 +37,14 @@ celery_app.conf.update(
     result_expires=3600,
 )
 
-BATCH_SIZE = 20  # mirrors rag_system.py BATCH_SIZE
+BATCH_SIZE = 20
 
 
 # ── Shared helper: batched Pinecone upsert ────────────────────────────────────
 
-def _batched_upsert(chunks, original_filename: str) -> int:
+def _batched_upsert(chunks, original_filename: str, namespace: str | None = None) -> int:
     """
     Embed and upsert chunks in batches of BATCH_SIZE.
-    Mirrors the batched upload loop in sync_mendix_context().
 
     Returns the number of successfully uploaded chunks.
     """
@@ -64,10 +55,12 @@ def _batched_upsert(chunks, original_filename: str) -> int:
 
     os.environ.setdefault("PINECONE_API_KEY", settings.pinecone_api_key)
 
+    target_ns = namespace or settings.pinecone_namespace
+
     vs = PineconeVectorStore(
         index_name=settings.pinecone_index_name,
         embedding=get_embeddings(),
-        namespace=settings.pinecone_namespace,
+        namespace=target_ns,
     )
 
     total = len(chunks)
@@ -117,12 +110,9 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
     """
     Ingest a single uploaded file:
       1. Load file content (plain read — supports .md, .yaml, .txt)
-      2. Classify (filename-first → LLM fallback)
-      3. Chunk with MarkdownHeaderTextSplitter + RecursiveCharacterTextSplitter
-      4. Batched embed + upsert into Pinecone
+      2. Chunk with MarkdownHeaderTextSplitter + RecursiveCharacterTextSplitter
+      3. Batched embed + upsert into Pinecone
     """
-    from core.ingestion.loader import fetch_project_context_documents
-    from core.ingestion.classifier import classify_document
     from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
     from langchain_core.documents import Document
 
@@ -134,9 +124,6 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
         content = path.read_text(encoding="utf-8", errors="ignore")
         file_name = path.name
 
-        doc_type, doc_layer, method = classify_document(file_name, content)
-        logger.info("[CLASSIFY] {} → type={}, layer={}, via={}", file_name, doc_type, doc_layer, method)
-
         headers = [("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3"), ("####", "Header 4")]
         md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers)
         text_splitter = RecursiveCharacterTextSplitter(
@@ -147,9 +134,9 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
         chunks = text_splitter.split_documents(md_splits) if md_splits else text_splitter.create_documents([content])
 
         for chunk in chunks:
-            chunk.metadata.update({"source": file_path, "file_name": file_name, "doc_type": doc_type, "layer": doc_layer})
+            chunk.metadata.update({"source": file_path, "file_name": file_name})
             header_ctx = " > ".join(chunk.metadata.get(f"Header {i}", "") for i in range(1, 5) if chunk.metadata.get(f"Header {i}"))
-            prefix = f"[FILE: {file_name} | TYPE: {doc_type} | LAYER: {doc_layer}]"
+            prefix = f"[FILE: {file_name}]"
             if header_ctx:
                 prefix += f"\n[SECTION: {header_ctx}]"
             chunk.page_content = prefix + "\n" + chunk.page_content
@@ -166,7 +153,7 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
         raise self.retry(exc=exc) from exc
 
 
-# ── Task 2: Full re-sync (mirrors sync_mendix_context) ───────────────────────
+# ── Task 2: Full re-sync ─────────────────────────────────────────────────────
 
 @celery_app.task(
     name="workers.sync_all_documents",
@@ -175,11 +162,10 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
     soft_time_limit=3600,
     time_limit=3660,
 )
-def sync_all_documents_task(self) -> dict:
+def sync_all_documents_task(self, namespace: str | None = None) -> dict:
     """
-    Full re-sync of all Output directory documents into Pinecone.
+    Full re-sync of all documents into Pinecone.
 
-    Mirrors sync_mendix_context() from rag_system.py:
       1. Fetch all chunks via fetch_project_context_documents()
       2. Delete entire namespace
       3. Batch-upload all chunks
@@ -187,100 +173,33 @@ def sync_all_documents_task(self) -> dict:
     import os
     from pinecone import Pinecone
 
-    logger.info("[SYNC] Starting full re-index...")
+    target_ns = namespace or settings.pinecone_namespace
+
+    logger.info("[SYNC] Starting full re-index to namespace '{}'...", target_ns)
     self.update_state(state="STARTED", meta={"stage": "loading"})
 
     from core.ingestion.loader import fetch_project_context_documents
     all_chunks = fetch_project_context_documents()
     total = len(all_chunks)
-    logger.info("[SYNC] {} chunks discovered, deleting namespace...", total)
+    logger.info("[SYNC] {} chunks discovered, deleting namespace '{}'...", total, target_ns)
 
-    # Delete namespace (mirrors index.delete(delete_all=True, namespace=…))
+    # Delete namespace
     pc = Pinecone(api_key=settings.pinecone_api_key)
     index = pc.Index(settings.pinecone_index_name)
     try:
-        index.delete(delete_all=True, namespace=settings.pinecone_namespace)
-        logger.info("[SYNC] Namespace '{}' cleared.", settings.pinecone_namespace)
+        index.delete(delete_all=True, namespace=target_ns)
+        logger.info("[SYNC] Namespace '{}' cleared.", target_ns)
     except Exception as exc:
         logger.warning("[SYNC] Namespace delete failed (may not exist): {}", exc)
 
     self.update_state(state="STARTED", meta={"stage": "uploading", "total": total})
-    uploaded = _batched_upsert(all_chunks, "full_sync")
+    uploaded = _batched_upsert(all_chunks, "full_sync", namespace=target_ns)
 
     result = {
         "chunks_synced": uploaded,
         "total_chunks": total,
-        "message": f"Successfully synced {uploaded}/{total} documentation chunks to Pinecone.",
+        "namespace": target_ns,
+        "message": f"Successfully synced {uploaded}/{total} chunks to namespace '{target_ns}'.",
     }
     logger.info("[SYNC DONE] {}", result["message"])
-    return result
-
-
-# ── Task 3: Tool Specification sync ───────────────────────────────────────────
-
-@celery_app.task(
-    name="workers.sync_tool_documents",
-    bind=True,
-    max_retries=1,
-    soft_time_limit=3600,
-    time_limit=3660,
-)
-def sync_tool_documents_task(self, tool_docs_dir: str, namespace: str | None = None) -> dict:
-    """
-    Sync Tool Specification markdown files into Pinecone using the 3-layer
-    tool_loader pipeline (chunk_tool_directory).
-
-    Pipeline:
-      1. chunk_tool_directory(tool_docs_dir) — Layer 1/2/3 chunking
-      2. Delete Pinecone namespace (clean slate)
-      3. Batch-embed + upsert (20 chunks/batch, exponential retry)
-
-    Args:
-        tool_docs_dir: Directory containing tool-spec .md files.
-        namespace:     Pinecone namespace to target. Defaults to settings value.
-    """
-    import os
-    from pinecone import Pinecone
-
-    from core.ingestion.tool_loader import chunk_tool_directory
-
-    target_namespace = namespace or settings.pinecone_namespace
-
-    logger.info("[TOOL_SYNC] Starting tool-spec sync | dir='{}' | namespace='{}'",
-                tool_docs_dir, target_namespace)
-    self.update_state(state="STARTED", meta={"stage": "chunking", "dir": tool_docs_dir})
-
-    try:
-        all_chunks = chunk_tool_directory(tool_docs_dir)
-    except FileNotFoundError as exc:
-        logger.error("[TOOL_SYNC] Directory error: {}", exc)
-        raise
-
-    total = len(all_chunks)
-    logger.info("[TOOL_SYNC] {} chunks discovered — clearing namespace '{}'...",
-                total, target_namespace)
-
-    # Delete namespace (clean slate — same pattern as sync_all_documents_task)
-    os.environ.setdefault("PINECONE_API_KEY", settings.pinecone_api_key)
-    pc = Pinecone(api_key=settings.pinecone_api_key)
-    index = pc.Index(settings.pinecone_index_name)
-    try:
-        index.delete(delete_all=True, namespace=target_namespace)
-        logger.info("[TOOL_SYNC] Namespace '{}' cleared.", target_namespace)
-    except Exception as exc:
-        logger.warning("[TOOL_SYNC] Namespace delete failed (may be empty / new): {}", exc)
-
-    self.update_state(state="STARTED", meta={"stage": "uploading", "total": total})
-    uploaded = _batched_upsert(all_chunks, f"tool_sync:{tool_docs_dir}")
-
-    result = {
-        "chunks_synced": uploaded,
-        "total_chunks":  total,
-        "namespace":     target_namespace,
-        "message": (
-            f"Tool-spec sync complete: {uploaded}/{total} chunks "
-            f"uploaded to namespace '{target_namespace}'."
-        ),
-    }
-    logger.info("[TOOL_SYNC DONE] {}", result["message"])
     return result

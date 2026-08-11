@@ -1,16 +1,8 @@
 """
-core/generation/chain.py — LLM generation với Gemini + Mendix coding rules.
+core/generation/chain.py — LLM generation with Gemini.
 
-Implements Phase 3 từ ai_instruction.instructions.md:
-  - Mendix 5-layer architecture awareness trong system prompt
-  - Naming convention enforcement: VAL_, ACT_, SUB_, WFA_
-  - Enum Guard instruction
-  - Error-aware refinement instruction
-  - Phase 4: Error Taxonomy guidance (7 categories)
-  - Phase 5: Conflict resolution awareness (CR_ > others; YAML > MD)
-  - Phase 6: STROT Schema Introspection instruction
-
-Sử dụng Google Gemini (ChatGoogleGenerativeAI) khớp với rag_system.py.
+General-purpose RAG generation chain.
+Uses Google Gemini (ChatGoogleGenerativeAI).
 """
 from __future__ import annotations
 
@@ -28,12 +20,11 @@ from models.pydantic_schemas import ChatMessage
 settings = get_settings()
 
 
-# ── System Prompt (embeds ai_instruction.instructions.md Phase 3-6) ───────────
+# ── System Prompt ─────────────────────────────────────────────────────────────
 
 RAG_SYSTEM_PROMPT = """\
-You are an Expert Mendix AI Developer and Architect. Your primary responsibility is to \
-design and write robust TypeScript code using the Mendix Model SDK based on ONLY the \
-precise project context provided below.
+You are a knowledgeable AI assistant. Your primary responsibility is to answer \
+questions based ONLY on the precise project context provided below.
 
 ═══════════════════════════════════════════
 RETRIEVED PROJECT CONTEXT (GROUNDING SOURCE):
@@ -41,50 +32,16 @@ RETRIEVED PROJECT CONTEXT (GROUNDING SOURCE):
 {context}
 ═══════════════════════════════════════════
 
-# CRITICAL RULES — NON-NEGOTIABLE:
+# CRITICAL RULES:
 
 ## Rule 1 — GROUND TRUTH ONLY
 Answer ONLY using the context above. If the answer is NOT in the context, respond:
-"I don't have enough information to answer that — please ensure sync has been run."
-NEVER fabricate entity names, attribute names, enum values, or microflow logic.
+"I don't have enough information to answer that — please ensure documents have been synced."
+NEVER fabricate information that is not present in the retrieved context.
 
-## Rule 2 — MENDIX CODING STANDARDS (Phase 3)
-When generating TypeScript Mendix Model SDK code:
-- **Naming Conventions (STRICT):**
-  - `VAL_` prefix → Validation microflows (must return Boolean)
-  - `ACT_` prefix → Action microflows (data manipulation, commit, rollback)
-  - `SUB_` prefix → Sub-microflows (reusable logic blocks)
-  - `WFA_` prefix → Workflow / Approval microflows (status transitions)
-- **Enum Guard:** NEVER use raw strings for Enum fields. Always verify exact Enum \
-values from the retrieved context.
-- **Error-Aware Refinement:** For multi-step data manipulation, always write explicit \
-validation blocks with intermediate variables for null checks and edge cases.
-- **STROT Schema Introspection (Phase 6):** BEFORE creating any new Entity or Attribute, \
-verify that it does NOT already exist in the retrieved schema. Reuse existing structures.
-
-## Rule 3 — DOCUMENT CONFLICT RESOLUTION (Phase 5)
-When retrieved context contains contradictions:
-1. Files with prefix `CR_`, `Log_`, `update_` → HIGHEST PRIORITY (most recent changes)
-2. `.yaml` files → Source of Truth for schema/structure (overrides `.md` descriptions)
-3. Lower layer data → overrides upper layer descriptions when conflicting
-
-## Rule 4 — OUTPUT FORMAT
-Your response MUST be structured as:
-1. **Query Log:** State the English query used for retrieval.
-2. **Code / Answer:** Clean, valid TypeScript (Mendix Model SDK) or direct answer.
-3. **Traceability Note:** 2-sentence summary how the output satisfies the business logic.
-
-## Rule 5 — ERROR TAXONOMY (Phase 4)
-If the user reports a code error, categorize it immediately:
-| Category | Code | Action |
-|----------|------|--------|
-| Syntax & API | [SDK_SYNTAX] | Fix missing createIn(), missing await, wrong modifiers |
-| Schema Link | [MAPPING_ERROR] | Re-verify entity/attribute/association names from context |
-| Data Type | [DATA_TYPE_MISMATCH] | Fix Enum assignment, use correct Mendix data types |
-| Microflow Logic | [FLOW_RETURN_VOID] | Fix return event type (VAL_ must return Boolean) |
-| Expressions | [INVALID_XPATH] | Fix XPath syntax: [Module.Entity_Assoc/Module.Entity/Attr = $Var] |
-| UI Components | [WIDGET_ERROR] | Fix DataView/ListView source and nested widget type matching |
-| Security | [SECURITY_ERROR] | Assign Module Roles to entities, microflows, and pages |
+## Rule 2 — OUTPUT FORMAT
+Your response should be clear, structured, and directly address the user's question.
+Cite specific documents or sections from the context when relevant.
 """
 
 
@@ -97,7 +54,7 @@ def get_llm() -> ChatGoogleGenerativeAI:
         model=settings.llm_model,
         google_api_key=settings.google_api_key,
         temperature=0.2,
-        max_output_tokens=4096,   # Tăng lên để đủ chứa TypeScript code
+        max_output_tokens=4096,
     )
 
 
@@ -121,23 +78,21 @@ async def generate_answer(
     history: list[ChatMessage],
 ) -> str:
     """
-    Invoke the Gemini RAG chain với Mendix coding rules embedded.
+    Invoke the Gemini RAG chain.
 
     Args:
-        query:          User question (có thể tiếng Việt hoặc English).
-        context_chunks: Retrieved document chunk texts (đã qua priority sort).
+        query:          User question.
+        context_chunks: Retrieved document chunk texts.
         history:        Prior conversation turns.
 
     Returns:
-        LLM answer (grounded TypeScript code hoặc factual answer).
+        LLM answer grounded in the provided context.
     """
-    # Build context string từ chunks
     if context_chunks:
         context = "\n\n---\n\n".join(context_chunks)
     else:
         context = "⚠️ No context retrieved. Cannot generate grounded output."
 
-    # Convert Pydantic history → LangChain messages
     lc_history = []
     for msg in history:
         if msg.role == "user":

@@ -1,13 +1,9 @@
 """
 api/ingest_router.py — Document sync and upload endpoints.
 
-Provides two sync mechanisms mirroring rag_system.py:
-
-  POST /api/v1/sync        — Triggers sync_mendix_context() as a Celery task.
+  POST /api/v1/sync        — Triggers full document re-sync as a Celery task.
                              *** Requires explicit user confirmation ***
-                             (mirrors the admin guard in rag_system.py)
-
-  POST /api/v1/upload-doc  — Upload a single .md/.yaml file for ingestion.
+  POST /api/v1/upload-doc  — Upload a single file for ingestion.
   GET  /api/v1/upload-doc/status/{task_id} — Poll task status.
 """
 from __future__ import annotations
@@ -28,15 +24,13 @@ from models.pydantic_schemas import (
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    pass  # celery task types only resolved at runtime
+    pass
 
-# Runtime import — Celery registers .delay() at decoration time, not import time
 from workers.celery_tasks import (
     celery_app,
     ingest_document_task,
     sync_all_documents_task,
-    sync_tool_documents_task,
-)  # noqa: E402
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -47,7 +41,7 @@ UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ── Sync (mirrors sync_mendix_context MCP tool) ───────────────────────────────
+# ── Sync ──────────────────────────────────────────────────────────────────────
 
 @router.post(
     "/sync",
@@ -60,23 +54,15 @@ async def trigger_sync(
         ..., embed=True,
         description="Must be true — explicit user consent required",
     ),
-    sync_type: str = Body(
-        "doc", embed=True,
-        description="'doc' — requirement docs (5-layer pipeline)  |  'tool' — tool-spec markdown (3-layer pipeline)",
-    ),
-    tool_docs_dir: str | None = Body(
+    namespace: str | None = Body(
         None, embed=True,
-        description="[tool only] Absolute path to the tool-spec .md directory. Falls back to TOOL_DOCS_DIR env var.",
+        description="Pinecone namespace to sync into. Defaults to settings value.",
     ),
 ) -> dict:
     """
     **ADMIN — USER CONSENT REQUIRED**
 
-    Re-indexes documentation into Pinecone (delete namespace + re-upload).
-
-    - `sync_type=doc`  — Requirement documents via the existing 5-layer classifier pipeline.
-    - `sync_type=tool` — Tool Specification markdown files via the 3-layer `tool_loader` pipeline.
-
+    Re-indexes all documentation into Pinecone (delete namespace + re-upload).
     The caller MUST pass `confirmed: true` in the request body.
     """
     if not confirmed:
@@ -88,41 +74,14 @@ async def trigger_sync(
             ),
         )
 
-    if sync_type not in ("doc", "tool"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="sync_type must be 'doc' (requirement docs) or 'tool' (tool-spec markdown).",
-        )
-
-    if sync_type == "doc":
-        task: Any = sync_all_documents_task.delay()  # type: ignore[attr-defined]
-        logger.info("[SYNC] Doc re-index task dispatched | task_id={}", task.id)
-        return {
-            "task_id":   task.id,
-            "sync_type": "doc",
-            "status":    "queued",
-            "message":   "Requirement-doc re-index queued. Poll /api/v1/upload-doc/status/{task_id}.",
-        }
-
-    # sync_type == "tool"
-    resolved_dir = tool_docs_dir or settings.tool_docs_dir
-    if not resolved_dir:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "tool_docs_dir is required for sync_type='tool'. "
-                "Pass it in the request body or set TOOL_DOCS_DIR in .env."
-            ),
-        )
-
-    task = sync_tool_documents_task.delay(resolved_dir)  # type: ignore[attr-defined]
-    logger.info("[TOOL_SYNC] Tool-spec sync task dispatched | dir='{}' | task_id={}",
-                resolved_dir, task.id)
+    resolved_ns = namespace or settings.pinecone_namespace
+    task: Any = sync_all_documents_task.delay(resolved_ns)  # type: ignore[attr-defined]
+    logger.info("[SYNC] Re-index task dispatched | namespace='{}' | task_id={}", resolved_ns, task.id)
     return {
         "task_id":   task.id,
-        "sync_type": "tool",
+        "namespace": resolved_ns,
         "status":    "queued",
-        "message":   f"Tool-spec sync queued for dir='{resolved_dir}'. Poll /api/v1/upload-doc/status/{{task_id}}.",
+        "message":   f"Re-index queued for namespace '{resolved_ns}'. Poll /api/v1/upload-doc/status/{{task_id}}.",
     }
 
 
@@ -137,7 +96,7 @@ async def trigger_sync(
 async def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
     """
     Accepts a file, validates it, saves it, and dispatches a Celery task
-    to chunk → embed → store in Pinecone (batched, rate-limited like rag_system.py).
+    to chunk → embed → store in Pinecone.
     """
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:

@@ -1,8 +1,9 @@
 """
 config.py — Centralized, type-safe configuration via Pydantic Settings v2.
-Mirrors the environment and model choices from the working rag_system.py:
-  - Google Gemini for embeddings + LLM  (not OpenAI)
-  - Pinecone as the vector store        (not Chroma/Qdrant)
+
+Stack:
+  - Google Gemini for embeddings + LLM
+  - Pinecone as the vector store
   - MarkdownHeaderTextSplitter chunking with size-900 fallback
 """
 from __future__ import annotations
@@ -31,17 +32,15 @@ class Settings(BaseSettings):
     app_port: int = 8000
     log_level: str = "INFO"
 
-    # ── Google Gemini (mirrors rag_system.py) ─────────────────────────────────
+    # ── Google Gemini ─────────────────────────────────────────────────────────
     google_api_key: str = Field("", description="Google AI API key")
     llm_model: str = "gemini-3.5-flash"
     embedding_model: str = "models/gemini-embedding-2"
-    classifier_model: str = "gemini-3.1-flash-lite"  # cheap model for doc classification
 
-    # ── Pinecone (mirrors rag_system.py) ──────────────────────────────────────
+    # ── Pinecone ──────────────────────────────────────────────────────────────
     pinecone_api_key: str = Field("", description="Pinecone API key")
     pinecone_index_name: str = "mendix-rag"
-    pinecone_namespace: str = "mendix-docs"
-    pinecone_tool_namespace: str = "tools"
+    pinecone_namespace: str = "documents"
 
     # ── Relational DB ─────────────────────────────────────────────────────────
     database_url: str = f"sqlite+aiosqlite:///{BASE_DIR / 'data' / 'rag_app.db'}"
@@ -50,26 +49,30 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
 
-    # ── RAG Chunking (mirrors rag_system.py values) ───────────────────────────
+    # ── RAG Chunking ──────────────────────────────────────────────────────────
     chunk_size: int = Field(900, ge=64, le=4096)
     chunk_overlap: int = Field(120, ge=0)
-    top_k_retrieval: int = Field(8, ge=1, le=20)    # k=8 from rag_system.py
-    embed_batch_size: int = 50                       # batched tenacity-backed embedding
-    llm_rate_limit_sleep: float = 4.0               # sleep between LLM classifier calls
+    top_k_retrieval: int = Field(8, ge=1, le=20)
+    embed_batch_size: int = 50
+    llm_rate_limit_sleep: float = 4.0
 
-    # ── Retrieval Orchestration ────────────────────────────────────────────────
-    max_calls_per_phase: int = 2                     # max Pinecone calls per retrieval phase
-    sufficient_chunk_threshold: int = 2              # min chunks to skip retry
+    # ── Retrieval ─────────────────────────────────────────────────────────────
+    max_calls_per_phase: int = 2
+    sufficient_chunk_threshold: int = 2
 
     # ── Document Discovery ────────────────────────────────────────────────────
-    # Comma-separated list of extra directories to scan for .md/.yaml files.
-    # Leave empty to use auto-discovery (same as rag_system.py _find_output_dirs logic).
+    # Comma-separated list of directory names to scan for documents.
+    # The default matches the namespace name. Auto-discovery searches for
+    # folders with these names (case-insensitive).
+    docs_dir_names: str = Field(
+        "documents",
+        description=(
+            "Comma-separated folder names to scan for .md/.yaml files. "
+            "Default matches the namespace name."
+        ),
+    )
+    # Comma-separated list of extra directories (absolute paths) to scan.
     docs_extra_dirs: str = ""
-
-    # ── Tool Spec Docs ────────────────────────────────────────────────────────
-    # Directory containing Tool Specification .md files (for --sync tool).
-    # Each file must contain <!-- tool_start id="N" name="fn" --> blocks.
-    tool_docs_dir: str = Field("", description="Path to tool-spec markdown directory")
 
 
 @lru_cache(maxsize=1)

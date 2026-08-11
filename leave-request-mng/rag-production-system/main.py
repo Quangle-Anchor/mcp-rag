@@ -7,7 +7,7 @@ Responsibilities:
   - Router mounting
   - NO AI / business logic lives here
 
-Stack mirrors rag_system.py:
+Stack:
   - Google Gemini for embeddings + LLM
   - Pinecone as vector store
 """
@@ -29,7 +29,7 @@ from db.relational_db import init_db
 from models.pydantic_schemas import ErrorDetail, HealthResponse
 
 settings = get_settings()
-APP_VERSION = "1.0.0"
+APP_VERSION = "2.0.0"
 
 
 @asynccontextmanager
@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
         description=(
             "Modular FastAPI backend for Retrieval-Augmented Generation.\n\n"
             "**Stack:** Google Gemini + Pinecone + LangChain\n\n"
-            "**Architecture:** 5-layer Mendix documentation model"
+            "**Features:** Document chunking, embedding, Pinecone storage & retrieval"
         ),
         version=APP_VERSION,
         docs_url="/docs",
@@ -99,7 +99,6 @@ def create_app() -> FastAPI:
             pinecone_namespace=settings.pinecone_namespace,
             llm_model=settings.llm_model,
             embedding_model=settings.embedding_model,
-            max_retrieve_calls=2,  # HARD LIMIT from ai_instruction.instructions.md
         )
 
     return app
