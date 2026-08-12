@@ -68,3 +68,11 @@ def get_retriever(
         logger.debug("Retriever: namespace='{}' | filter={}", namespace, metadata_filter)
 
     return store.as_retriever(search_kwargs=search_kwargs)
+
+def check_namespace_exists(namespace: str) -> bool:
+    """Check if a namespace exists in the Pinecone index."""
+    from pinecone import Pinecone
+    pc = Pinecone(api_key=settings.pinecone_api_key)
+    index = pc.Index(settings.pinecone_index_name)
+    stats = index.describe_index_stats()
+    return namespace in stats.get("namespaces", {})

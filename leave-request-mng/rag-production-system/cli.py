@@ -195,7 +195,7 @@ def _run_sync(namespace_arg: str | None = None) -> None:
     # ── Build BM25 index for hybrid search ────────────────────────────────────
     logger.info("Step 4/4 — Building BM25 keyword index...")
     from core.retrieval.bm25_index import build_and_persist_bm25
-    bm25_idx = build_and_persist_bm25(all_chunks)
+    bm25_idx = build_and_persist_bm25(all_chunks, namespace=chosen_namespace)
     logger.info("  BM25 index: {} chunks indexed.", len(all_chunks))
 
     logger.info("=" * 60)
@@ -235,6 +235,78 @@ async def run_query(query: str, namespace_arg: str | None = None) -> None:
     print("=" * 60 + "\n")
 
 
+# ── Scan Source Code ──────────────────────────────────────────────────────────
+
+def _run_scan_code(folder_name: str, namespace_arg: str | None = None) -> None:
+    """
+    Scan a sibling source code folder, chunk with language-aware separators,
+    and upload to Pinecone.
+    """
+    import os as _os
+    from config import get_settings
+    settings = get_settings()
+
+    _os.environ.setdefault("GOOGLE_API_KEY", settings.google_api_key)
+    _os.environ.setdefault("PINECONE_API_KEY", settings.pinecone_api_key)
+
+    from core.ingestion.code_loader import resolve_sibling_folder, scan_source_code
+    from core.ingestion.embeddings import get_embeddings
+    from core.retrieval.bm25_index import build_and_persist_bm25
+
+    namespace = namespace_arg or folder_name
+
+    logger.info("=" * 60)
+    logger.info("🔍  CODE SCAN — Source Code Chunking + Pinecone Upload")
+    logger.info("  Folder:    {}", folder_name)
+    logger.info("  Namespace: {}", namespace)
+    logger.info("=" * 60)
+
+    try:
+        folder_path = resolve_sibling_folder(folder_name)
+    except FileNotFoundError as exc:
+        print(str(exc))
+        sys.exit(1)
+
+    logger.info("Step 1/3 — Scanning and chunking source code...")
+    all_chunks, lang_stats = scan_source_code(folder_path, project_name=folder_name)
+
+    total = len(all_chunks)
+    if total == 0:
+        logger.warning("No source files found in '{}'.", folder_name)
+        return
+    logger.info("  Found {} chunks from {} files.", total, sum(lang_stats.values()))
+    logger.info("  Languages: {}", ", ".join(f"{k}:{v}" for k, v in sorted(lang_stats.items())))
+
+    from pinecone import Pinecone
+    from langchain_pinecone import PineconeVectorStore
+
+    pc = Pinecone(api_key=settings.pinecone_api_key)
+    index = pc.Index(settings.pinecone_index_name)
+
+    logger.info("Step 2/3 — Clearing namespace '{}'...", namespace)
+    try:
+        index.delete(delete_all=True, namespace=namespace)
+        logger.info("  Namespace '{}' cleared.", namespace)
+    except Exception as exc:
+        logger.warning("  Namespace delete failed (may be new/empty): {}", exc)
+
+    logger.info("Step 3/3 — Uploading {} chunks...", total)
+    vs = PineconeVectorStore(
+        index_name=settings.pinecone_index_name,
+        embedding=get_embeddings(),
+        namespace=namespace,
+    )
+    uploaded = _batched_upsert_cli(all_chunks, vs, f"code-scan:{folder_name}")
+
+    # Build BM25 index
+    bm25_idx = build_and_persist_bm25(all_chunks, namespace=namespace)
+
+    logger.info("=" * 60)
+    logger.info("✅  CODE SCAN COMPLETE: {}/{} chunks → namespace '{}'.",
+                uploaded, total, namespace)
+    logger.info("=" * 60)
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -247,8 +319,11 @@ Examples:
   python cli.py --sync
   python cli.py --sync --namespace documents
 
+  # Scan source code folder (sibling to this project)
+  python cli.py --scan-code detect-error
+  python cli.py --scan-code detect-error --namespace detect-error-code
+
   # Query (retrieve raw Pinecone context, no LLM generation)
-  python cli.py --query "search for something"
   python cli.py --query "search" --namespace my-namespace
 
   # Start API server
@@ -260,6 +335,12 @@ Examples:
         "--sync",
         action="store_true",
         help="Sync documents to Pinecone",
+    )
+    group.add_argument(
+        "--scan-code",
+        type=str,
+        metavar="FOLDER",
+        help="Scan a sibling source code folder and index into Pinecone",
     )
     group.add_argument(
         "--query",
@@ -274,13 +355,15 @@ Examples:
 
     parser.add_argument(
         "--namespace", type=str, default=None,
-        help="[--sync/--query] Pinecone namespace to use (skips interactive picker for sync)",
+        help="[--sync/--query/--scan-code] Pinecone namespace to use",
     )
 
     args = parser.parse_args()
 
     if args.sync:
         _run_sync(namespace_arg=args.namespace)
+    elif args.scan_code:
+        _run_scan_code(args.scan_code, namespace_arg=args.namespace)
     elif args.query:
         asyncio.run(run_query(args.query, args.namespace))
     elif args.serve:
@@ -290,3 +373,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
+

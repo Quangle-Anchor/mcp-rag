@@ -39,3 +39,10 @@ Agent kiểu ReAct tự lập kế hoạch: câu này cần tìm ở collection 
 * Hành động rủi ro (gửi mail, cam kết với khách) → dừng lại chờ người duyệt (human-in-the-loop)
 * 
 Search là tính năng. Agent + tri thức + quy trình mới là giải pháp.
+
+
+
+## bug
+khi type namespace không tồn tại thì thay vì báo lỗi thì tool return không tìm thấy context và trả về không có context. Cần sửa lại
+
+Cần fix lại rerank của chức năng scan source code, hiện tại chỉ dùng vector search còn BM25 thì không dùng và 

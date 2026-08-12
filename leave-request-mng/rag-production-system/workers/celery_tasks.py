@@ -196,9 +196,9 @@ def sync_all_documents_task(self, namespace: str | None = None) -> dict:
     uploaded = _batched_upsert(all_chunks, "full_sync", namespace=target_ns)
 
     # Build BM25 index for hybrid search
-    logger.info("[SYNC] Building BM25 keyword index...")
+    logger.info("[SYNC] 5. Build BM25 index")
     from core.retrieval.bm25_index import build_and_persist_bm25
-    build_and_persist_bm25(all_chunks)
+    build_and_persist_bm25(all_chunks, namespace=target_ns)
 
     result = {
         "chunks_synced": uploaded,

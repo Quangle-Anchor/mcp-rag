@@ -182,7 +182,7 @@ async def _retrieve_once(
     dense_chunks = _docs_to_chunks(docs)
 
     # ── 3. BM25 search ───────────────────────────────────────────────────────
-    bm25_index = get_bm25_index()
+    bm25_index = get_bm25_index(namespace=namespace or settings.pinecone_namespace)
     bm25_results: list[dict[str, Any]] = []
 
     if bm25_index.is_ready:
@@ -243,6 +243,13 @@ async def retrieve_chunks(
     k = top_k or settings.top_k_retrieval
     max_attempts = settings.max_retrieval_attempts if settings.enable_self_reflection else 1
     all_chunks: list[dict[str, Any]] = []
+
+    # Validate namespace before proceeding
+    from db.vector_db import check_namespace_exists
+    target_ns = namespace or settings.pinecone_namespace
+    if not check_namespace_exists(target_ns):
+        raise ValueError(f"Namespace '{target_ns}' does not exist in the database.")
+
 
     for attempt in range(1, max_attempts + 1):
         # Determine query for this attempt

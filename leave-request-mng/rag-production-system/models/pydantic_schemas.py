@@ -68,7 +68,7 @@ class SourceChunk(BaseModel):
     """A chunk retrieved from Pinecone."""
     chunk_id: str
     document_name: str
-    score: float = Field(..., ge=0.0, le=1.0)
+    score: float = Field(..., ge=0.0)
     snippet: str = Field(..., description="First 300 chars of chunk content")
 
 
@@ -126,3 +126,36 @@ class ErrorDetail(BaseModel):
     code: str
     message: str
     details: dict[str, Any] | None = None
+
+
+# ── Code Scan Schemas ─────────────────────────────────────────────────────────
+
+class CodeScanRequest(BaseModel):
+    """Payload for POST /api/v1/code/scan."""
+    folder_name: str = Field(
+        ..., min_length=1, max_length=256,
+        description="Name of the sibling folder to scan (e.g., 'detect-error').",
+    )
+    namespace: str | None = Field(
+        None,
+        description="Pinecone namespace. Defaults to folder_name if not provided.",
+    )
+
+    @field_validator("folder_name")
+    @classmethod
+    def sanitize_folder_name(cls, v: str) -> str:
+        v = v.strip().strip("/").strip("\\")
+        if ".." in v or "/" in v or "\\" in v:
+            raise ValueError("folder_name must be a simple directory name, no path traversal.")
+        return v
+
+
+class CodeScanResponse(BaseModel):
+    """Response from POST /api/v1/code/scan."""
+    folder_name: str
+    namespace: str
+    files_scanned: int
+    chunks_created: int
+    languages: list[str] = Field(default_factory=list)
+    message: str
+

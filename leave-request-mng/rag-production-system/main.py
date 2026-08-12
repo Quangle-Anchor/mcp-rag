@@ -23,6 +23,7 @@ from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from api.chat_router import router as chat_router
+from api.code_router import router as code_router
 from api.ingest_router import router as ingest_router
 from config import get_settings
 from db.relational_db import init_db
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
 
     # ── Routers ───────────────────────────────────────────────────────────────
     app.include_router(chat_router,   prefix="/api/v1", tags=["Chat"])
+    app.include_router(code_router,   prefix="/api/v1/code", tags=["Code Scan"])
     app.include_router(ingest_router, prefix="/api/v1", tags=["Ingestion"])
 
     # ── Global Error Handler ──────────────────────────────────────────────────

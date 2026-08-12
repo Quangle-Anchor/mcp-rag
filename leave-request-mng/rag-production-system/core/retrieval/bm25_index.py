@@ -133,9 +133,14 @@ class BM25Index:
         )
         return results
 
-    def save(self, path: str | None = None) -> None:
+    def save(self, namespace: str = "default", path: str | None = None) -> None:
         """Persist BM25 index to disk."""
-        save_path = path or settings.bm25_index_path
+        if path:
+            save_path = path
+        else:
+            base_dir = os.path.dirname(settings.bm25_index_path)
+            save_path = os.path.join(base_dir, f"bm25_index_{namespace}.pkl")
+            
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
         data = {
@@ -149,9 +154,14 @@ class BM25Index:
         logger.info("[BM25] Index saved to {} ({} chunks)", save_path, len(self._chunk_contents))
 
     @classmethod
-    def load(cls, path: str | None = None) -> BM25Index:
+    def load(cls, namespace: str = "default", path: str | None = None) -> BM25Index:
         """Load BM25 index from disk. Returns empty index if file not found."""
-        load_path = path or settings.bm25_index_path
+        if path:
+            load_path = path
+        else:
+            base_dir = os.path.dirname(settings.bm25_index_path)
+            load_path = os.path.join(base_dir, f"bm25_index_{namespace}.pkl")
+            
         index = cls()
 
         if not os.path.exists(load_path):
@@ -176,32 +186,32 @@ class BM25Index:
         return index
 
 
-# ── Singleton ─────────────────────────────────────────────────────────────────
+# ── Singleton Dictionary ──────────────────────────────────────────────────────
 
-_global_index: BM25Index | None = None
+_global_indices: dict[str, BM25Index] = {}
 
 
-def get_bm25_index() -> BM25Index:
+def get_bm25_index(namespace: str = "default") -> BM25Index:
     """Return the global BM25 index (lazy-loaded from disk)."""
-    global _global_index
-    if _global_index is None:
-        _global_index = BM25Index.load()
-    return _global_index
+    global _global_indices
+    if namespace not in _global_indices:
+        _global_indices[namespace] = BM25Index.load(namespace=namespace)
+    return _global_indices[namespace]
 
 
-def set_bm25_index(index: BM25Index) -> None:
+def set_bm25_index(index: BM25Index, namespace: str = "default") -> None:
     """Replace the global BM25 index (called after sync)."""
-    global _global_index
-    _global_index = index
+    global _global_indices
+    _global_indices[namespace] = index
 
 
-def build_and_persist_bm25(chunks: list) -> BM25Index:
+def build_and_persist_bm25(chunks: list, namespace: str = "default") -> BM25Index:
     """
     Convenience: build BM25 index from chunks, save to disk, set as global.
     Called after sync completes.
     """
     index = BM25Index()
     index.build(chunks)
-    index.save()
-    set_bm25_index(index)
+    index.save(namespace=namespace)
+    set_bm25_index(index, namespace=namespace)
     return index
