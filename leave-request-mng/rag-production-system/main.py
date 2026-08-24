@@ -9,7 +9,7 @@ Responsibilities:
 
 Stack:
   - Google Gemini for embeddings + LLM
-  - Pinecone as vector store
+  - Qdrant as vector store (local Docker)
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from db.relational_db import init_db
 from models.pydantic_schemas import ErrorDetail, HealthResponse
 
 settings = get_settings()
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 
 
 @asynccontextmanager
@@ -38,8 +38,8 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     logger.info("⚡  RAG Production System v{} starting…", APP_VERSION)
     await init_db()
     logger.info("✅  Database initialised | DB: {}", settings.database_url)
-    logger.info("✅  Pinecone index='{}' namespace='{}'",
-                settings.pinecone_index_name, settings.pinecone_namespace)
+    logger.info("✅  Qdrant url='{}' | collection_prefix='{}' | default_namespace='{}'",
+                settings.qdrant_url, settings.qdrant_collection_prefix, settings.default_namespace)
     yield
     logger.info("🛑  Shutting down.")
 
@@ -49,8 +49,8 @@ def create_app() -> FastAPI:
         title="RAG Production System",
         description=(
             "Modular FastAPI backend for Retrieval-Augmented Generation.\n\n"
-            "**Stack:** Google Gemini + Pinecone + LangChain\n\n"
-            "**Features:** Document chunking, embedding, Pinecone storage & retrieval"
+            "**Stack:** Google Gemini + Qdrant + LangChain\n\n"
+            "**Features:** Document chunking, embedding, Qdrant storage & retrieval"
         ),
         version=APP_VERSION,
         docs_url="/docs",
@@ -97,8 +97,8 @@ def create_app() -> FastAPI:
     async def health_check():
         return HealthResponse(
             version=APP_VERSION,
-            pinecone_index=settings.pinecone_index_name,
-            pinecone_namespace=settings.pinecone_namespace,
+            qdrant_url=settings.qdrant_url,
+            default_namespace=settings.default_namespace,
             llm_model=settings.llm_model,
             embedding_model=settings.embedding_model,
         )

@@ -1,67 +1,105 @@
-import React, { useState, useCallback } from 'react';
-import Sidebar from './components/Sidebar/Settings';
-import Chat from './components/Chat/Chat';
-import ContextPanel from './components/Context/ContextPanel';
-import SettingsPage, { loadSettings } from './components/Settings/SettingsPage';
+import React, { useState, useEffect } from 'react';
+import Header from './components/Header/Header';
+import FolderScannerConsole from './components/Console/FolderScannerConsole';
+import ChatConsole from './components/Chat/ChatConsole';
+import SettingsModal from './components/Settings/SettingsModal';
 
-function App() {
-  const [page, setPage] = useState('chat'); // 'chat' | 'settings'
-  const [settings, setSettings] = useState(() => loadSettings());
-  const [namespace, setNamespace] = useState(settings.namespace || 'docs');
-  const [retrievedChunks, setRetrievedChunks] = useState([]);
-  const [isContextOpen, setIsContextOpen] = useState(false);
+const STORAGE_KEY_THEME = 'rag_studio_theme';
+const STORAGE_KEY_SETTINGS = 'rag_studio_settings';
+const STORAGE_KEY_NS = 'rag_studio_namespace';
 
-  const handleSettingsChange = useCallback((newSettings) => {
+export default function App() {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem(STORAGE_KEY_THEME) || 'cyber-emerald';
+  });
+
+  const [namespace, setNamespace] = useState(() => {
+    return localStorage.getItem(STORAGE_KEY_NS) || 'docs';
+  });
+
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
+      return saved ? JSON.parse(saved) : {
+        googleApiKey: '',
+        openaiApiKey: '',
+        llmProvider: 'google',
+        topK: 8,
+        vectorBackend: 'pinecone',
+      };
+    } catch {
+      return {
+        googleApiKey: '',
+        openaiApiKey: '',
+        llmProvider: 'google',
+        topK: 8,
+        vectorBackend: 'pinecone',
+      };
+    }
+  });
+
+  // Apply theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem(STORAGE_KEY_THEME, theme);
+  }, [theme]);
+
+  // Sync namespace to localStorage
+  useEffect(() => {
+    if (namespace) {
+      localStorage.setItem(STORAGE_KEY_NS, namespace);
+    }
+  }, [namespace]);
+
+  const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
-    setNamespace(newSettings.namespace || 'docs');
-  }, []);
+    localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
+  };
 
-  const handleChunksRetrieved = useCallback((chunks) => {
-    setRetrievedChunks(chunks);
-    if (chunks.length > 0) setIsContextOpen(true);
-  }, []);
-
-  // ── Settings page ──────────────────────────────────────────────────────────
-  if (page === 'settings') {
-    return (
-      <SettingsPage
-        onBack={() => {
-          // Reload settings when going back
-          setSettings(loadSettings());
-          setPage('chat');
-        }}
-        onSettingsChange={handleSettingsChange}
-      />
-    );
-  }
-
-  // ── Chat page ──────────────────────────────────────────────────────────────
   return (
-    <div className="app-layout">
-      <Sidebar
+    <div className="app-shell">
+      {/* Top Header */}
+      <Header
         namespace={namespace}
-        setNamespace={setNamespace}
-        settings={settings}
-        onOpenSettings={() => setPage('settings')}
+        theme={theme}
+        onThemeChange={setTheme}
+        isChatOpen={isChatOpen}
+        onToggleChat={() => setIsChatOpen(prev => !prev)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      <main className="main-content">
-        <Chat
-          namespace={namespace}
-          settings={settings}
-          onChunksRetrieved={handleChunksRetrieved}
-          isContextOpen={isContextOpen}
-          setIsContextOpen={setIsContextOpen}
-        />
+      {/* Main Workspace Split Layout */}
+      <main className="app-workspace">
+        {/* Main Ingestion & Scanner Console */}
+        <div className="workspace-main-panel">
+          <FolderScannerConsole
+            namespace={namespace}
+            setNamespace={setNamespace}
+            settings={settings}
+          />
+        </div>
 
-        <ContextPanel
-          chunks={retrievedChunks}
-          isOpen={isContextOpen}
-          onClose={() => setIsContextOpen(false)}
-        />
+        {/* Collapsible Chat & Hybrid Retrieval Workspace */}
+        {isChatOpen && (
+          <div className="workspace-chat-panel">
+            <ChatConsole
+              namespace={namespace}
+              settings={settings}
+            />
+          </div>
+        )}
       </main>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSaveSettings={handleSaveSettings}
+      />
     </div>
   );
 }
-
-export default App;

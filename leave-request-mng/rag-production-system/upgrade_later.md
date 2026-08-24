@@ -14,4 +14,8 @@ Nguyên tắc cắt:ưu tiên cắt theo cấu trúc tài liệu (theo đoạn v
 
 Phương pháp: dùng LangChain RecursiveCharacterTextSplitter với paragraph, markdown, latex, table, code, html separators.
 
-Cắt tài liệu sai là mọi thứ phía sau vô nghĩa. Hợp đồng, slide, báo cáo tài chính - không thể cắt cùng một kiểu. Mình phải làm 6 chiến lược (semantic, parent-child, hierarchical...) tùy loại tài liệu.≤
+Cắt tài liệu sai là mọi thứ phía sau vô nghĩa. Hợp đồng, slide, báo cáo tài chính - không thể cắt cùng một kiểu. Mình phải làm 6 chiến lược (semantic, parent-child, hierarchical...) tùy loại tài liệu.
+
+
+# chỉnh lại cơ chế scan folder
+hiện tại tool đang có cơ chế nếu không scan ra folder "documents" thì tự động scan file .md .yaml cùng cấp với tool để sync

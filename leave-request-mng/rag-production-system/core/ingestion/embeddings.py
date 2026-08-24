@@ -2,6 +2,7 @@
 core/ingestion/embeddings.py — Batched, tenacity-backed Gemini embeddings.
 
 Refactored from the original 1-by-1 + hardcoded sleep implementation.
+Vector store: Qdrant (local Docker).
 
 Key improvements
 ────────────────
@@ -12,13 +13,15 @@ Key improvements
        → only pauses when the API actually complains, not preventively
        → for a typical 200-chunk sync: ~4 calls instead of 200
 
+  Vector dimension: 3072 (full Gemini gemini-embedding-2 native output, no truncation).
+
 Architecture
 ────────────
   embed_documents()
     └── _embed_batch_with_retry()   ← one call per batch of ≤ BATCH_SIZE texts
           └── @retry (tenacity)     ← exponential back-off ONLY on 429 / rate errors
                 └── super().embed_documents(batch)   ← real Gemini API call
-                      └── result[:1024]              ← Pinecone dimensionality cap
+                      └── result[:VECTOR_DIM]        ← Qdrant dimensionality
 
   embed_query()
     └── @retry (tenacity)           ← same back-off for single-text lookups
@@ -58,8 +61,9 @@ settings = get_settings()
 # Gemini embedding API accepts up to 100 texts/call; 50 is a safe ceiling.
 BATCH_SIZE: int = 50
 
-# Pinecone index dimensionality — all vectors MUST be truncated to this.
-PINECONE_DIM: int = 1024
+# Vector dimensionality — Gemini gemini-embedding-2 produces 3072-dim vectors.
+# Using full dimensions for maximum semantic accuracy (quality-first).
+VECTOR_DIM: int = 3072
 
 
 # ── Tenacity helpers ──────────────────────────────────────────────────────────
@@ -103,7 +107,7 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
     - Batches texts (default: 50 per request) → far fewer API calls than 1-by-1.
     - Zero artificial sleep — the system runs at full API speed.
     - Automatic exponential back-off via tenacity ONLY when a 429 is received.
-    - All vectors truncated to PINECONE_DIM (1024) dimensions.
+    - All vectors truncated to VECTOR_DIM (3072) dimensions.
     """
 
     def embed_documents(  # type: ignore[override]
@@ -129,6 +133,11 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
         total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
 
         for batch_idx, start in enumerate(range(0, len(texts), BATCH_SIZE)):
+            if batch_idx > 0 and settings.llm_rate_limit_sleep > 0:
+                import time
+                logger.debug("[EMBED] Pacing delay: sleeping {:.1f}s between batches...", settings.llm_rate_limit_sleep)
+                time.sleep(settings.llm_rate_limit_sleep)
+
             batch = texts[start: start + BATCH_SIZE]
             logger.debug(
                 "[EMBED] Batch {}/{} — {} text(s) | chars: {}",
@@ -143,14 +152,14 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
 
         logger.info(
             "[EMBED] embed_documents complete — {} texts → {} vectors ({}D each)",
-            len(texts), len(all_vectors), PINECONE_DIM,
+            len(texts), len(all_vectors), VECTOR_DIM,
         )
         return all_vectors
 
     @retry(
         retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_exponential(multiplier=1, min=4, max=60),
-        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=16, max=60),
+        stop=stop_after_attempt(6),
         before_sleep=_log_retry,
         reraise=True,
     )
@@ -162,12 +171,12 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
         returns True. Auth errors, network errors etc. propagate immediately.
         """
         raw: list[list[float]] = super().embed_documents(batch)  # type: ignore[arg-type]
-        return [v[:PINECONE_DIM] for v in raw]
+        return [v[:VECTOR_DIM] for v in raw]
 
     @retry(
         retry=retry_if_exception(is_rate_limit_error),
-        wait=wait_exponential(multiplier=1, min=4, max=60),
-        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=16, max=60),
+        stop=stop_after_attempt(6),
         before_sleep=_log_retry,
         reraise=True,
     )
@@ -184,7 +193,7 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
         Used by retrieval (query-time), not during bulk ingestion.
         """
         result: list[float] = super().embed_query(text)  # type: ignore[arg-type]
-        return result[:PINECONE_DIM]
+        return result[:VECTOR_DIM]
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────

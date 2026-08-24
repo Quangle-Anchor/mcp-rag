@@ -1,0 +1,39 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Bytecode & Caches
+__pycache__/
+*/__pycache__/
+*/*/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+pyright_out.json
+
+# Environment Secrets
+.env
+.env.local
+.env.*.local
+!*.env.example
+
+# Runtime Databases and Indexes
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite3
+data/*.pkl
+data/bm25_index_*.pkl
+data/uploads/
+debug_output.txt
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Frontend
+web/node_modules/
+web/dist/

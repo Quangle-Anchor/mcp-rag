@@ -2,8 +2,8 @@
 mcp_server.py — FastMCP wrapper for the RAG Production System.
 
 Provides two MCP tools:
-  - sync_documents: Re-index all documents into Pinecone
-  - retrieve_context: Retrieve document chunks from Pinecone
+  - sync_documents: Re-index all documents into Qdrant
+  - retrieve_context: Retrieve document chunks from Qdrant
 """
 from __future__ import annotations
 
@@ -47,17 +47,17 @@ def _sanitize_filter(f: Any) -> Any:
 def sync_documents(namespace: Optional[str] = None) -> str:
     """
     [ADMIN — USER CONSENT REQUIRED]
-    Re-index all project documentation files into Pinecone.
+    Re-index all project documentation files into Qdrant.
 
     *** AI AGENT: YOU ARE STRICTLY FORBIDDEN FROM CALLING THIS TOOL DIRECTLY. ***
     Before executing this tool you MUST:
       1. Inform the user that a full re-index is needed and why.
-      2. Ask: "Do you want me to reset and re-sync the Pinecone index? This will
+      2. Ask: "Do you want me to reset and re-sync the Qdrant index? This will
          delete all existing vectors and re-upload all documents."
       3. Proceed ONLY if the user explicitly answers YES.
 
     Args:
-        namespace: Optional Pinecone namespace. Defaults to settings value.
+        namespace: Optional namespace. Defaults to settings value.
     """
     import io
     from contextlib import redirect_stdout, redirect_stderr
@@ -67,7 +67,7 @@ def sync_documents(namespace: Optional[str] = None) -> str:
     out = io.StringIO()
     with redirect_stdout(out), redirect_stderr(out):
         try:
-            _run_sync(namespace_arg=namespace or settings.pinecone_namespace)
+            _run_sync(namespace_arg=namespace or settings.default_namespace)
         except Exception as e:
             return f"Sync failed: {e}\n{out.getvalue()}"
 
@@ -81,12 +81,12 @@ async def retrieve_context(
     metadata_filter: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    Retrieve context from the Pinecone knowledge base.
+    Retrieve context from the Qdrant knowledge base.
 
     Args:
         query: A precise description of the information needed.
-        namespace: Pinecone namespace to query. Defaults to settings value.
-        metadata_filter: Optional Pinecone metadata filter object.
+        namespace: Namespace to query. Defaults to settings value.
+        metadata_filter: Optional metadata filter object.
     """
     safe_filter = _sanitize_filter(metadata_filter) if metadata_filter else None
 
@@ -105,8 +105,6 @@ async def retrieve_context(
 def _require_env() -> None:
     if not os.environ.get("GOOGLE_API_KEY"):
         raise RuntimeError("Missing GOOGLE_API_KEY in environment.")
-    if not os.environ.get("PINECONE_API_KEY"):
-        raise RuntimeError("Missing PINECONE_API_KEY in environment.")
 
 if __name__ == "__main__":
     _require_env()

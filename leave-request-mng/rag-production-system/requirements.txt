@@ -18,9 +18,9 @@ langchain-text-splitters>=0.2.0
 langchain-google-genai>=1.0.5
 google-generativeai>=0.5.2
 
-# ── Pinecone (mirrors rag_system.py) ──────────────────────────────────────────
-pinecone-client>=3.2.2
-langchain-pinecone>=0.1.1
+# ── Qdrant (local Docker vector store) ────────────────────────────────────────
+qdrant-client>=1.9.0
+langchain-qdrant>=0.2.0
 
 # ── Relational DB ─────────────────────────────────────────────────────────────
 sqlalchemy>=2.0.30

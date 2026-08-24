@@ -1,7 +1,7 @@
 """
 core/retrieval/bm25_index.py — In-memory BM25 keyword search index.
 
-Provides keyword-based retrieval alongside Pinecone dense vector search.
+Provides keyword-based retrieval alongside Qdrant dense vector search.
 Built from the same document chunks at sync time, persisted to disk
 so it survives server restarts.
 

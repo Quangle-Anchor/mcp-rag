@@ -54,7 +54,7 @@ class ChatRequest(BaseModel):
     )
     namespace: str | None = Field(
         None,
-        description="Pinecone namespace to query. Defaults to settings value.",
+        description="Namespace to query. Defaults to settings value.",
     )
     stream: bool = Field(False, description="SSE streaming (future)")
 
@@ -65,7 +65,7 @@ class ChatRequest(BaseModel):
 
 
 class SourceChunk(BaseModel):
-    """A chunk retrieved from Pinecone."""
+    """A chunk retrieved from vector store."""
     chunk_id: str
     document_name: str
     score: float = Field(..., ge=0.0)
@@ -79,7 +79,7 @@ class ChatResponse(BaseModel):
     sources: list[SourceChunk] = Field(default_factory=list)
     latency_ms: float
     model_used: str
-    retrieve_calls_used: int = Field(0, ge=0, description="Number of Pinecone calls made")
+    retrieve_calls_used: int = Field(0, ge=0, description="Number of retrieval calls made")
     context_blocks: str = Field("", description="Formatted source blocks")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -115,8 +115,8 @@ class SyncResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
-    pinecone_index: str
-    pinecone_namespace: str
+    qdrant_url: str
+    default_namespace: str
     llm_model: str
     embedding_model: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -138,7 +138,7 @@ class CodeScanRequest(BaseModel):
     )
     namespace: str | None = Field(
         None,
-        description="Pinecone namespace. Defaults to folder_name if not provided.",
+        description="Namespace. Defaults to folder_name if not provided.",
     )
 
     @field_validator("folder_name")

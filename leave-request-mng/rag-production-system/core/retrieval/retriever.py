@@ -3,7 +3,7 @@ core/retrieval/retriever.py — Hybrid Search retrieval pipeline.
 
 Pipeline (per query):
   1. Query Optimization: detect IDs, expand bare ID queries
-  2. Dense Search: Pinecone vector similarity → top_k × 2 candidates
+  2. Dense Search: Qdrant vector similarity → top_k × 2 candidates
   3. BM25 Search: In-memory keyword index → top_k × 2 candidates
   4. RRF Fusion: Merge dense + BM25 results with Reciprocal Rank Fusion
   5. Keyword Reranking: Boost chunks containing exact ID matches
@@ -156,7 +156,7 @@ async def _retrieve_once(
 
     Steps:
       1. Expand query (if bare ID)
-      2. Dense search via Pinecone
+      2. Dense search via Qdrant
       3. BM25 search via in-memory index
       4. RRF Fusion + Keyword Reranking
       5. Deduplicate + Trim
@@ -164,7 +164,7 @@ async def _retrieve_once(
     # ── 1. Query expansion ────────────────────────────────────────────────────
     search_query = expand_bare_id_query(query) if attempt == 1 else query
 
-    # ── 2. Dense search (Pinecone) ────────────────────────────────────────────
+    # ── 2. Dense search (Qdrant) ────────────────────────────────────────────
     retriever_instance = get_retriever(
         top_k=top_k * 2,  # Over-fetch for fusion
         namespace=namespace,
@@ -174,7 +174,7 @@ async def _retrieve_once(
     logger.info(
         "[RETRIEVE] attempt={} | namespace='{}' | top_k={} | query='{}'",
         attempt,
-        namespace or settings.pinecone_namespace,
+        namespace or settings.default_namespace,
         top_k, search_query[:80],
     )
 
@@ -182,7 +182,7 @@ async def _retrieve_once(
     dense_chunks = _docs_to_chunks(docs)
 
     # ── 3. BM25 search ───────────────────────────────────────────────────────
-    bm25_index = get_bm25_index(namespace=namespace or settings.pinecone_namespace)
+    bm25_index = get_bm25_index(namespace=namespace or settings.default_namespace)
     bm25_results: list[dict[str, Any]] = []
 
     if bm25_index.is_ready:
@@ -234,8 +234,8 @@ async def retrieve_chunks(
     Args:
         query:           Search query text.
         top_k:           Number of chunks to retrieve.
-        namespace:       Pinecone namespace (defaults to settings).
-        metadata_filter: Optional Pinecone metadata filter dict.
+        namespace:       Qdrant namespace (collection). Defaults to settings.
+        metadata_filter: Optional metadata filter dict.
 
     Returns:
         (chunks, error_message) — error_message is None on success.
@@ -246,7 +246,7 @@ async def retrieve_chunks(
 
     # Validate namespace before proceeding
     from db.vector_db import check_namespace_exists
-    target_ns = namespace or settings.pinecone_namespace
+    target_ns = namespace or settings.default_namespace
     if not check_namespace_exists(target_ns):
         raise ValueError(f"Namespace '{target_ns}' does not exist in the database.")
 

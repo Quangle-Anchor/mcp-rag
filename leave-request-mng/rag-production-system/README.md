@@ -74,6 +74,7 @@ MCP Server kết nối RAG với các AI Client (Cursor / Claude Desktop / Archo
 #### `cli.py`
 Công cụ dòng lệnh phụ dùng để test nhanh:
 - Đồng bộ tài liệu: `.venv/bin/python cli.py --sync`
+- Quét và đồng bộ mã nguồn: `.venv/bin/python cli.py --scan-code <tên_thư_mục_ngang_hàng>`
 - Query trực tiếp: `.venv/bin/python cli.py --query "Nội dung cần tìm"`
 
 ---
@@ -86,7 +87,7 @@ Công cụ dòng lệnh phụ dùng để test nhanh:
    `loader.py` dùng `MarkdownHeaderTextSplitter` để tách theo các thẻ tiêu đề (`#`, `##`, `###`), sau đó dùng `RecursiveCharacterTextSplitter` chia nhỏ chunk.
 3. **Embedding**:
    `embeddings.py` gửi batch vector lên Gemini (`models/gemini-embedding-2`) với cơ chế retry tự động.
-4. **Vector Store**:
+4. **Vectoxr Store**:
    Lưu trữ vector và metadata vào Pinecone (namespace mặc định: `documents`).
 5. **Retrieval**:
    `retriever.py` thực hiện truy vấn thông tin chính xác từ Pinecone vector database.
@@ -96,6 +97,8 @@ Công cụ dòng lệnh phụ dùng để test nhanh:
 ## 🚀 Khởi động nhanh
 
 ```bash
+# 0. Fix PATH của mac 
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 # 1. Tạo và kích hoạt môi trường ảo Python
 python3 -m venv .venv
 source .venv/bin/activate
@@ -110,7 +113,10 @@ mkdir -p documents
 # 4. Sync tài liệu vào Pinecone
 python cli.py --sync
 
-# 5. Chạy Web Server
+# 5. Quét và lưu trữ source code (VD: quét thư mục frontend)
+python cli.py --scan-code frontend
+
+# 6. Chạy Web Server
 python3 main.py
 ```
 

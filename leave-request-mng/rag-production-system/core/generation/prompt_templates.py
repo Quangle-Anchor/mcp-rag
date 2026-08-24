@@ -12,7 +12,7 @@ CQR_REWRITE_PROMPT = """\
 You are a RAG Query Optimizer.
 
 Transform the user's raw query into a structured, high-density retrieval query \
-for a Pinecone vector database containing project documentation.
+for a Qdrant vector database containing project documentation.
 
 User's raw query: {raw_query}
 

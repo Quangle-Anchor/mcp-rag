@@ -8,7 +8,6 @@ Two tasks:
 from __future__ import annotations
 
 import os
-import uuid
 from pathlib import Path
 
 from celery import Celery
@@ -40,7 +39,7 @@ celery_app.conf.update(
 BATCH_SIZE = 20
 
 
-# ── Shared helper: batched Pinecone upsert ────────────────────────────────────
+# ── Shared helper: batched Qdrant upsert ──────────────────────────────────────
 
 def _batched_upsert(chunks, original_filename: str, namespace: str | None = None) -> int:
     """
@@ -49,19 +48,10 @@ def _batched_upsert(chunks, original_filename: str, namespace: str | None = None
     Returns the number of successfully uploaded chunks.
     """
     import time
-    from langchain_pinecone import PineconeVectorStore
+    from db.vector_db import get_vector_store
 
-    from core.ingestion.embeddings import get_embeddings
-
-    os.environ.setdefault("PINECONE_API_KEY", settings.pinecone_api_key)
-
-    target_ns = namespace or settings.pinecone_namespace
-
-    vs = PineconeVectorStore(
-        index_name=settings.pinecone_index_name,
-        embedding=get_embeddings(),
-        namespace=target_ns,
-    )
+    target_ns = namespace or settings.default_namespace
+    vs = get_vector_store(namespace=target_ns)
 
     total = len(chunks)
     uploaded = 0
@@ -111,7 +101,7 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
     Ingest a single uploaded file:
       1. Load file content (plain read — supports .md, .yaml, .txt)
       2. Chunk with MarkdownHeaderTextSplitter + RecursiveCharacterTextSplitter
-      3. Batched embed + upsert into Pinecone
+      3. Batched embed + upsert into Qdrant
     """
     from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
     from langchain_core.documents import Document
@@ -164,16 +154,15 @@ def ingest_document_task(self, file_path: str, original_filename: str) -> dict:
 )
 def sync_all_documents_task(self, namespace: str | None = None) -> dict:
     """
-    Full re-sync of all documents into Pinecone.
+    Full re-sync of all documents into Qdrant.
 
       1. Fetch all chunks via fetch_project_context_documents()
-      2. Delete entire namespace
+      2. Delete entire namespace (Qdrant collection)
       3. Batch-upload all chunks
     """
-    import os
-    from pinecone import Pinecone
+    from db.vector_db import clear_namespace
 
-    target_ns = namespace or settings.pinecone_namespace
+    target_ns = namespace or settings.default_namespace
 
     logger.info("[SYNC] Starting full re-index to namespace '{}'...", target_ns)
     self.update_state(state="STARTED", meta={"stage": "loading"})
@@ -181,16 +170,14 @@ def sync_all_documents_task(self, namespace: str | None = None) -> dict:
     from core.ingestion.loader import fetch_project_context_documents
     all_chunks = fetch_project_context_documents()
     total = len(all_chunks)
-    logger.info("[SYNC] {} chunks discovered, deleting namespace '{}'...", total, target_ns)
+    logger.info("[SYNC] {} chunks discovered, clearing namespace '{}'...", total, target_ns)
 
-    # Delete namespace
-    pc = Pinecone(api_key=settings.pinecone_api_key)
-    index = pc.Index(settings.pinecone_index_name)
+    # Clear namespace (delete + recreate Qdrant collection)
     try:
-        index.delete(delete_all=True, namespace=target_ns)
+        clear_namespace(target_ns)
         logger.info("[SYNC] Namespace '{}' cleared.", target_ns)
     except Exception as exc:
-        logger.warning("[SYNC] Namespace delete failed (may not exist): {}", exc)
+        logger.warning("[SYNC] Namespace clear failed: {}", exc)
 
     self.update_state(state="STARTED", meta={"stage": "uploading", "total": total})
     uploaded = _batched_upsert(all_chunks, "full_sync", namespace=target_ns)

@@ -5,8 +5,8 @@ RAG retrieval endpoint.
 
 Flow:
   1. Receive user query
-  2. Retrieve chunks from Pinecone
-  3. Return context (raw Pinecone chunks, no LLM generation)
+  2. Retrieve chunks from Qdrant
+  3. Return context (raw Qdrant chunks, no LLM generation)
 """
 from __future__ import annotations
 
@@ -30,9 +30,9 @@ settings = get_settings()
     "/chat",
     response_model=ChatResponse,
     status_code=status.HTTP_200_OK,
-    summary="RAG retrieval — retrieve context from Pinecone",
+    summary="RAG retrieval — retrieve context from Qdrant",
     description=(
-        "Retrieves relevant document chunks from Pinecone for the given query.\n\n"
+        "Retrieves relevant document chunks from Qdrant for the given query.\n\n"
         "Returns raw context blocks without LLM generation.\n\n"
         "**Multi-language:** Accepts any language input.\n"
     ),

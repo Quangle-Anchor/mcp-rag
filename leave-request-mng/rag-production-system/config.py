@@ -3,7 +3,7 @@ config.py — Centralized, type-safe configuration via Pydantic Settings v2.
 
 Stack:
   - Google Gemini for embeddings + LLM
-  - Pinecone as the vector store
+  - Qdrant as the vector store (local Docker)
   - MarkdownHeaderTextSplitter chunking with size-900 fallback
 """
 from __future__ import annotations
@@ -37,10 +37,10 @@ class Settings(BaseSettings):
     llm_model: str = "gemini-3.5-flash"
     embedding_model: str = "models/gemini-embedding-2"
 
-    # ── Pinecone ──────────────────────────────────────────────────────────────
-    pinecone_api_key: str = Field("", description="Pinecone API key")
-    pinecone_index_name: str = "mendix-rag"
-    pinecone_namespace: str = "documents"
+    # ── Qdrant (local Docker) ─────────────────────────────────────────────────
+    qdrant_url: str = Field("http://localhost:6333", description="Qdrant server URL")
+    qdrant_collection_prefix: str = Field("rag", description="Prefix for Qdrant collection names")
+    default_namespace: str = Field("documents", description="Default namespace (maps to a Qdrant collection)")
 
     # ── Relational DB ─────────────────────────────────────────────────────────
     database_url: str = f"sqlite+aiosqlite:///{BASE_DIR / 'data' / 'rag_app.db'}"
@@ -82,6 +82,15 @@ class Settings(BaseSettings):
     enable_self_reflection: bool = Field(True, description="Auto-retry with rewritten query if context insufficient")
     max_retrieval_attempts: int = Field(2, ge=1, le=3, description="Max retrieval attempts (1 original + retries)")
     bm25_index_path: str = str(BASE_DIR / "data" / "bm25_index.pkl")
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def collection_name_for(self, namespace: str | None = None) -> str:
+        """Return the Qdrant collection name for a given namespace."""
+        ns = namespace or self.default_namespace
+        # Sanitize: replace non-alphanumeric with underscore
+        safe_ns = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in ns)
+        return f"{self.qdrant_collection_prefix}_{safe_ns}"
 
 
 @lru_cache(maxsize=1)

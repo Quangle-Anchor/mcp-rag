@@ -91,9 +91,12 @@ class DocumentRecord(Base):
 
 async def init_db() -> None:
     """Create all tables if they do not exist (idempotent)."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Relational DB tables verified/created")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Relational DB tables verified/created")
+    except Exception as exc:
+        logger.warning("Relational DB init notice: {}", exc)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
