@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     google_api_key: str = Field("", description="Google AI API key")
     llm_model: str = "gemini-3.5-flash"
     embedding_model: str = "models/gemini-embedding-2"
+    vision_model: str = Field("gemini-2.0-flash", description="Model for Vision OCR on scanned pages")
 
     # ── Qdrant (local Docker) ─────────────────────────────────────────────────
     qdrant_url: str = Field("http://localhost:6333", description="Qdrant server URL")

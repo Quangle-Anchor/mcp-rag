@@ -240,12 +240,16 @@ def fetch_project_context_documents(
         )
 
     # ── Build glob patterns (STRICTLY inside document directories) ───────────
+    # Text files + Visual files (PDF, images)
+    _TEXT_EXTS = ("md", "yaml")
+    _VISUAL_EXTS = ("pdf", "png", "jpg", "jpeg", "webp")
+    _ALL_EXTS = _TEXT_EXTS + _VISUAL_EXTS
+
     patterns = []
     for doc_dir in doc_dirs:
-        patterns.append(os.path.join(doc_dir, "*.md"))
-        patterns.append(os.path.join(doc_dir, "*.yaml"))
-        patterns.append(os.path.join(doc_dir, "**", "*.md"))
-        patterns.append(os.path.join(doc_dir, "**", "*.yaml"))
+        for ext in _ALL_EXTS:
+            patterns.append(os.path.join(doc_dir, f"*.{ext}"))
+            patterns.append(os.path.join(doc_dir, "**", f"*.{ext}"))
 
     # ── Splitters ─────────────────────────────────────────────────────────────
     markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=HEADERS_TO_SPLIT_ON)
@@ -271,20 +275,35 @@ def fetch_project_context_documents(
                 continue
 
             file_name = os.path.basename(abs_fp)
+            file_ext = os.path.splitext(abs_fp)[1].lower()
 
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-            except UnicodeDecodeError:
+            # ── Read content (text vs visual files) ───────────────────────────
+            if file_ext in (".pdf", ".png", ".jpg", ".jpeg", ".webp"):
+                # Visual file → Vision parser (PDF page classifier + Gemini OCR)
                 try:
-                    with open(file_path, "r", encoding="utf-16") as f:
+                    from core.ingestion.parsers.vision_parser import parse_visual_file
+                    content = parse_visual_file(abs_fp)
+                except Exception as exc:
+                    logger.error("[ERROR vision-parse {}] {}", file_path, exc)
+                    continue
+                if not content or not content.strip():
+                    logger.warning("[SKIP] Vision parser returned empty for {}", file_name)
+                    continue
+            else:
+                # Text file (.md, .yaml) → direct read
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
+                except UnicodeDecodeError:
+                    try:
+                        with open(file_path, "r", encoding="utf-16") as f:
+                            content = f.read()
+                    except Exception as exc:
+                        logger.error("[ERROR reading {}] {}", file_path, exc)
+                        continue
                 except Exception as exc:
                     logger.error("[ERROR reading {}] {}", file_path, exc)
                     continue
-            except Exception as exc:
-                logger.error("[ERROR reading {}] {}", file_path, exc)
-                continue
 
             # ── Split ─────────────────────────────────────────────────────────
             md_splits = markdown_splitter.split_text(content)

@@ -48,3 +48,7 @@ rank-bm25>=0.2.2         # BM25 keyword search for hybrid retrieval (RRF fusion)
 
 # ── Resilience / Retry ────────────────────────────────────────────────────────
 tenacity>=8.3.0          # @retry decorator for Gemini 429 rate-limit back-off
+
+# ── Vision PDF/Image Parsing ──────────────────────────────────────────────────
+PyMuPDF>=1.24.0          # PDF page analysis, text extraction, image rendering
+Pillow>=10.3.0           # Image handling for Gemini Vision API

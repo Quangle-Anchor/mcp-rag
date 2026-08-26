@@ -39,7 +39,7 @@ from workers.celery_tasks import (
 router = APIRouter()
 settings = get_settings()
 
-ALLOWED_EXTENSIONS = {".md", ".yaml", ".txt", ".pdf", ".docx"}
+ALLOWED_EXTENSIONS = {".md", ".yaml", ".txt", ".pdf", ".docx", ".png", ".jpg", ".jpeg", ".webp"}
 MAX_FILE_SIZE_MB = 50
 UPLOAD_DIR = Path("data/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

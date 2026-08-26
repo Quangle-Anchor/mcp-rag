@@ -37,10 +37,16 @@ Tenacity policy
 from __future__ import annotations
 
 import os
+import warnings
 from functools import lru_cache
 from typing import Any
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# Suppress the deprecation warning for clean logs
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import google.generativeai as genai
+
+from langchain_core.embeddings import Embeddings
 from loguru import logger
 from tenacity import (
     RetryCallState,
@@ -90,7 +96,7 @@ def _log_retry(retry_state: RetryCallState) -> None:
     logger.warning(
         "[EMBED RETRY] attempt {}/{} — {} — waiting {:.1f}s before next try…",
         retry_state.attempt_number,
-        5,
+        6,
         type(exc).__name__ if exc else "unknown",
         float(wait) if isinstance(wait, (int, float)) else 0,
     )
@@ -98,33 +104,29 @@ def _log_retry(retry_state: RetryCallState) -> None:
 
 # ── Core class ────────────────────────────────────────────────────────────────
 
-class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
+class CustomGeminiEmbeddings(Embeddings):
     """
-    Batched, rate-resilient wrapper around GoogleGenerativeAIEmbeddings.
+    Batched, rate-resilient Embeddings implementation using Google Gemini API.
 
     Behaviour
     ---------
     - Batches texts (default: 50 per request) → far fewer API calls than 1-by-1.
-    - Zero artificial sleep — the system runs at full API speed.
+    - Uses direct Google Generative AI client (bypassing httpx socket hanging issues).
     - Automatic exponential back-off via tenacity ONLY when a 429 is received.
-    - All vectors truncated to VECTOR_DIM (3072) dimensions.
+    - All vectors normalized to VECTOR_DIM (3072) dimensions.
     """
 
-    def embed_documents(  # type: ignore[override]
-        self,
-        texts: list[str],
-        *,
-        batch_size: int = 0,
-        task_type: str | None = None,
-        titles: list[str] | None = None,
-        output_dimensionality: int | None = None,
-    ) -> list[list[float]]:
+    def __init__(self, model: str | None = None) -> None:
+        self.model = model or settings.embedding_model
+        if settings.google_api_key:
+            genai.configure(api_key=settings.google_api_key)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """
         Embed a list of texts using batched Gemini API calls.
 
-        Splits `texts` into chunks of BATCH_SIZE and calls the parent
-        embed_documents() once per chunk. Each batch is wrapped with
-        tenacity retry logic — NO sleep unless a 429 error is encountered.
+        Splits `texts` into chunks of BATCH_SIZE and calls the API once per chunk.
+        Each batch is wrapped with tenacity retry logic on 429 errors.
         """
         if not texts:
             return []
@@ -135,10 +137,13 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
         for batch_idx, start in enumerate(range(0, len(texts), BATCH_SIZE)):
             if batch_idx > 0 and settings.llm_rate_limit_sleep > 0:
                 import time
-                logger.debug("[EMBED] Pacing delay: sleeping {:.1f}s between batches...", settings.llm_rate_limit_sleep)
+                logger.debug(
+                    "[EMBED] Pacing delay: sleeping {:.1f}s between batches...",
+                    settings.llm_rate_limit_sleep,
+                )
                 time.sleep(settings.llm_rate_limit_sleep)
 
-            batch = texts[start: start + BATCH_SIZE]
+            batch = texts[start : start + BATCH_SIZE]
             logger.debug(
                 "[EMBED] Batch {}/{} — {} text(s) | chars: {}",
                 batch_idx + 1,
@@ -152,7 +157,9 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
 
         logger.info(
             "[EMBED] embed_documents complete — {} texts → {} vectors ({}D each)",
-            len(texts), len(all_vectors), VECTOR_DIM,
+            len(texts),
+            len(all_vectors),
+            VECTOR_DIM,
         )
         return all_vectors
 
@@ -166,11 +173,15 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
     def _embed_batch_with_retry(self, batch: list[str]) -> list[list[float]]:
         """
         Single batched API call with tenacity retry on 429.
-
-        The @retry decorator pauses and retries ONLY when is_rate_limit_error()
-        returns True. Auth errors, network errors etc. propagate immediately.
         """
-        raw: list[list[float]] = super().embed_documents(batch)  # type: ignore[arg-type]
+        response = genai.embed_content(
+            model=self.model,
+            content=batch,
+            task_type="retrieval_document",
+        )
+        raw = response.get("embedding", [])
+        if raw and not isinstance(raw[0], list):
+            raw = [raw]
         return [v[:VECTOR_DIM] for v in raw]
 
     @retry(
@@ -180,20 +191,18 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
         before_sleep=_log_retry,
         reraise=True,
     )
-    def embed_query(  # type: ignore[override]
-        self,
-        text: str,
-        *,
-        task_type: str | None = None,
-        title: str | None = None,
-        output_dimensionality: int | None = None,
-    ) -> list[float]:
+    def embed_query(self, text: str) -> list[float]:
         """
         Embed a single query string with tenacity retry on 429.
         Used by retrieval (query-time), not during bulk ingestion.
         """
-        result: list[float] = super().embed_query(text)  # type: ignore[arg-type]
-        return result[:VECTOR_DIM]
+        response = genai.embed_content(
+            model=self.model,
+            content=text,
+            task_type="retrieval_query",
+        )
+        raw = response.get("embedding", [])
+        return raw[:VECTOR_DIM]
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
@@ -202,8 +211,9 @@ class CustomGeminiEmbeddings(GoogleGenerativeAIEmbeddings):
 def get_embeddings() -> CustomGeminiEmbeddings:
     """
     Return a cached singleton CustomGeminiEmbeddings instance.
-    Sets GOOGLE_API_KEY env var before init (langchain reads it from env).
+    Sets GOOGLE_API_KEY env var before init.
     """
     if settings.google_api_key:
         os.environ.setdefault("GOOGLE_API_KEY", settings.google_api_key)
     return CustomGeminiEmbeddings(model=settings.embedding_model)
+
