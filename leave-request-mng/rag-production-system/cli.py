@@ -42,11 +42,31 @@ def _run_sync(namespace_arg: str | None = None, folder_name: str | None = None) 
     # Clear existing data in namespace
     clear_namespace(chosen_namespace)
 
-    # Upload to Qdrant
+    # Upload to Qdrant (batched with retry, matching celery_tasks pattern)
     vs = get_vector_store(namespace=chosen_namespace)
-    vs.add_documents(all_chunks)
+    batch_size = 20
+    uploaded = 0
+    for start in range(0, len(all_chunks), batch_size):
+        batch = all_chunks[start: start + batch_size]
+        for attempt in range(3):
+            try:
+                vs.add_documents(batch)
+                uploaded += len(batch)
+                break
+            except Exception as exc:
+                if attempt < 2:
+                    import time
+                    wait = 2 ** attempt * 5
+                    logger.warning("[RETRY] Batch {}/{} failed ({}). Waiting {}s...",
+                                   start // batch_size + 1,
+                                   (len(all_chunks) + batch_size - 1) // batch_size,
+                                   type(exc).__name__, wait)
+                    time.sleep(wait)
+                else:
+                    logger.error("[ERROR] Batch permanently failed: {}", exc)
+
     build_and_persist_bm25(all_chunks, namespace=chosen_namespace)
-    logger.info("✅  SYNC COMPLETE: {} chunks → namespace '{}'", len(all_chunks), chosen_namespace)
+    logger.info("✅  SYNC COMPLETE: {} chunks → namespace '{}'", uploaded, chosen_namespace)
 
 
 async def run_query(query: str, namespace_arg: str | None = None) -> None:
@@ -77,11 +97,31 @@ def _run_scan_code(folder_name: str, namespace_arg: str | None = None) -> None:
     # Clear existing data in namespace
     clear_namespace(namespace)
 
-    # Upload to Qdrant
+    # Upload to Qdrant (batched with retry)
     vs = get_vector_store(namespace=namespace)
-    vs.add_documents(all_chunks)
+    batch_size = 20
+    uploaded = 0
+    for start in range(0, len(all_chunks), batch_size):
+        batch = all_chunks[start: start + batch_size]
+        for attempt in range(3):
+            try:
+                vs.add_documents(batch)
+                uploaded += len(batch)
+                break
+            except Exception as exc:
+                if attempt < 2:
+                    import time
+                    wait = 2 ** attempt * 5
+                    logger.warning("[RETRY] Batch {}/{} failed ({}). Waiting {}s...",
+                                   start // batch_size + 1,
+                                   (len(all_chunks) + batch_size - 1) // batch_size,
+                                   type(exc).__name__, wait)
+                    time.sleep(wait)
+                else:
+                    logger.error("[ERROR] Batch permanently failed: {}", exc)
+
     build_and_persist_bm25(all_chunks, namespace=namespace)
-    logger.info("✅  CODE SCAN COMPLETE: {} chunks → namespace '{}'", len(all_chunks), namespace)
+    logger.info("✅  CODE SCAN COMPLETE: {} chunks → namespace '{}'", uploaded, namespace)
 
 
 def main() -> None:
@@ -91,7 +131,7 @@ def main() -> None:
     group.add_argument("--scan-code", type=str, metavar="FOLDER", help="Scan source code folder")
     group.add_argument("--query", type=str, help="Search query")
     group.add_argument("--serve", action="store_true", help="Start API server")
-    parser.add_argument("--namespace", type=str, default=None, help="Namespace (maps to Qdrant collection)")
+    parser.add_argument("--namespace", type=str, required=True, help="Namespace (maps to Qdrant collection) — REQUIRED")
 
     args = parser.parse_args()
 
